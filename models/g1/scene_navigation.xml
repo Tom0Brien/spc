@@ -21,8 +21,6 @@
     <material name="goal_marker_mat" rgba="0 1 0 0.3"/>
   </asset>
 
-
-
   <worldbody>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
