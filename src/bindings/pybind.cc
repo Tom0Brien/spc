@@ -2,6 +2,9 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <iostream>
+#include <cstdarg>
+#include <cstdio>
 
 #include "spc/algs/cem.h"
 #include "spc/algs/optimizer.h"

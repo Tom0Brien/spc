@@ -3,6 +3,7 @@ project(spc VERSION 0.1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
@@ -38,19 +39,29 @@ if(NOT GTEST_FOUND)
   FetchContent_MakeAvailable(googletest)
 endif()
 
-# Fetch MuJoCo properly (Build from source for maximum portability)
-FetchContent_Declare(
-  mujoco
-  GIT_REPOSITORY https://github.com/google-deepmind/mujoco.git
-  GIT_TAG        3.3.7
+# Link against the Python `mujoco` package instead of building from source
+find_package(Python REQUIRED COMPONENTS Interpreter)
+
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c "import mujoco; import os; print(os.path.dirname(mujoco.__file__))"
+    OUTPUT_VARIABLE MUJOCO_PY_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-set(MUJOCO_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(MUJOCO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(MUJOCO_BUILD_SIMULATE OFF CACHE BOOL "" FORCE)
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c "import mujoco; import os; print(os.path.dirname(mujoco.HEADERS_DIR))"
+    OUTPUT_VARIABLE MUJOCO_HEADERS_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+file(GLOB MUJOCO_PY_LIB "${MUJOCO_PY_DIR}/libmujoco.so*")
+list(GET MUJOCO_PY_LIB 0 MUJOCO_PY_LIB_PATH)
 
-# Do not apply global flags that mess with third-party libraries
-
-FetchContent_MakeAvailable(mujoco)
+add_library(mujoco::mujoco SHARED IMPORTED)
+set_target_properties(mujoco::mujoco PROPERTIES
+    IMPORTED_LOCATION "${MUJOCO_PY_LIB_PATH}"
+    INTERFACE_INCLUDE_DIRECTORIES "${MUJOCO_HEADERS_DIR}"
+)
+# Ensure scikit-build-core installs this library if needed, though it's already in the environment
+install(FILES ${MUJOCO_PY_LIB_PATH} DESTINATION lib)
 
 # Fetch ONNX Runtime (pre-built binary for Linux x64)
 FetchContent_Declare(
