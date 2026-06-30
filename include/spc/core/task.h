@@ -1,12 +1,13 @@
 #pragma once
 
 #include <mujoco/mujoco.h>
-#include <vector>
-#include <memory>
-#include "spc/core/policy.h"
 
-#include <unordered_map>
+#include <memory>
 #include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "spc/core/policy.h"
 
 namespace spc {
 namespace core {
@@ -30,7 +31,7 @@ public:
     /**
      * @brief Extract the observation array from the current MuJoCo state.
      * This is passed to the RL policy.
-     * 
+     *
      * @param model Pointer to the MuJoCo model.
      * @param data Pointer to the MuJoCo data (state).
      * @param obs_out Pre-allocated array to write the observation into.
@@ -39,7 +40,7 @@ public:
 
     /**
      * @brief Compute the running cost at a specific time step.
-     * 
+     *
      * @param model Pointer to the MuJoCo model.
      * @param data Pointer to the MuJoCo data (state).
      * @param control The applied control action.
@@ -49,7 +50,7 @@ public:
 
     /**
      * @brief Compute the terminal cost at the end of a rollout.
-     * 
+     *
      * @param model Pointer to the MuJoCo model.
      * @param data Pointer to the MuJoCo data (state).
      * @return double The scalar terminal cost.
@@ -58,20 +59,20 @@ public:
 
     /**
      * @brief Compute constraint violations.
-     * 
+     *
      * @param model Pointer to the MuJoCo model.
      * @param data Pointer to the MuJoCo data (state).
      * @param control The applied control action.
      * @return double Constraint cost. >0 indicates a violation. <=0 is safe.
      */
     virtual double ConstraintCost(const mjModel* model, const mjData* data, const float* control) const {
-        return 0.0; // Default: unconstrained
+        return 0.0;  // Default: unconstrained
     }
 
     /**
      * @brief Apply the control action. The task evaluates the base policy if any,
      * combines it with the residual, applies scaling, and writes to data->ctrl.
-     * 
+     *
      * @param model Pointer to the MuJoCo model.
      * @param data Pointer to the MuJoCo data (state) to be modified.
      * @param residual The residual control from the optimizer.
@@ -85,13 +86,11 @@ public:
     /**
      * @brief Set the base policy for the task to evaluate during ApplyControl.
      */
-    virtual void SetPolicy(std::shared_ptr<Policy> policy) {
-        policy_ = policy;
-    }
+    virtual void SetPolicy(std::shared_ptr<Policy> policy) { policy_ = policy; }
 
 protected:
     std::shared_ptr<Policy> policy_ = nullptr;
 };
 
-} // namespace core
-} // namespace spc
+}  // namespace core
+}  // namespace spc

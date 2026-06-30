@@ -1,10 +1,10 @@
-import sys
 import os
 import time
+
 os.environ["OMP_PROC_BIND"] = "true"
 os.environ["OMP_PLACES"] = "cores"
-import mujoco
 import spc_py
+
 env = spc_py.SpcEnv("models/franka_push/scene.xml")
 task = spc_py.create_task("FrankaPushTask", env)
 policy = spc_py.ONNXPolicy("policies/franka_push.onnx")
@@ -31,7 +31,7 @@ start = time.time()
 for _ in range(N):
     env.step_mpc(cem, 2)
 avg = (time.time() - start) / N
-print(f"With policy: avg {avg*1000:.1f}ms over {N} steps ({0.02/avg:.2f}x realtime)")
+print(f"With policy: avg {avg * 1000:.1f}ms over {N} steps ({0.02 / avg:.2f}x realtime)")
 
 cem_no_policy = spc_py.CEM(env, task, None, config)
 env.step_mpc(cem_no_policy, 2)
@@ -39,4 +39,4 @@ start = time.time()
 for _ in range(N):
     env.step_mpc(cem_no_policy, 2)
 avg = (time.time() - start) / N
-print(f"Without policy: avg {avg*1000:.1f}ms over {N} steps ({0.02/avg:.2f}x realtime)")
+print(f"Without policy: avg {avg * 1000:.1f}ms over {N} steps ({0.02 / avg:.2f}x realtime)")

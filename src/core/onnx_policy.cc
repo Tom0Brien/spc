@@ -1,6 +1,7 @@
 #include "spc/core/onnx_policy.h"
-#include <stdexcept>
+
 #include <iostream>
+#include <stdexcept>
 
 namespace spc {
 namespace core {
@@ -45,25 +46,20 @@ void ONNXPolicy::ComputeAction(const float* obs, int obs_dim, float* action_out,
         throw std::runtime_error("ONNXPolicy: Model not loaded.");
     }
 
-    int64_t input_shape[2] = {1, obs_dim}; // batch_size=1
-    
-    // Const cast is required because Ort::Value::CreateTensor takes non-const pointer, 
-    // but we only use it as an input tensor, so it won't be modified.
-    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-        memory_info_, const_cast<float*>(obs), obs_dim, input_shape, 2);
+    int64_t input_shape[2] = {1, obs_dim};  // batch_size=1
 
-    int64_t output_shape[2] = {1, action_dim}; // batch_size=1
-    Ort::Value output_tensor = Ort::Value::CreateTensor<float>(
-        memory_info_, action_out, action_dim, output_shape, 2);
+    // Const cast is required because Ort::Value::CreateTensor takes non-const pointer,
+    // but we only use it as an input tensor, so it won't be modified.
+    Ort::Value input_tensor =
+        Ort::Value::CreateTensor<float>(memory_info_, const_cast<float*>(obs), obs_dim, input_shape, 2);
+
+    int64_t output_shape[2] = {1, action_dim};  // batch_size=1
+    Ort::Value output_tensor = Ort::Value::CreateTensor<float>(memory_info_, action_out, action_dim, output_shape, 2);
 
     // Run inference with pre-allocated tensor
     Ort::RunOptions run_options{nullptr};
-    session_->Run(
-        run_options, 
-        input_names_.data(), &input_tensor, 1, 
-        output_names_.data(), &output_tensor, 1
-    );
+    session_->Run(run_options, input_names_.data(), &input_tensor, 1, output_names_.data(), &output_tensor, 1);
 }
 
-} // namespace core
-} // namespace spc
+}  // namespace core
+}  // namespace spc

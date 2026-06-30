@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace spc {
 namespace core {
@@ -34,5 +34,5 @@ public:
     virtual void ComputeAction(const float* obs, int obs_dim, float* action, int action_dim) const = 0;
 };
 
-} // namespace core
-} // namespace spc
+}  // namespace core
+}  // namespace spc

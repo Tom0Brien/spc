@@ -1,7 +1,8 @@
 #pragma once
 
-#include "spc/algs/optimizer.h"
 #include <random>
+
+#include "spc/algs/optimizer.h"
 
 namespace spc {
 namespace algs {
@@ -21,9 +22,7 @@ struct CEMConfig : public OptimizerConfig {
  */
 class CEM : public Optimizer {
 public:
-    CEM(mjModel* model, 
-        std::shared_ptr<core::Task> task,
-        std::shared_ptr<core::Policy> policy,
+    CEM(mjModel* model, std::shared_ptr<core::Task> task, std::shared_ptr<core::Policy> policy,
         const CEMConfig& config);
 
     ~CEM() override = default;
@@ -35,11 +34,11 @@ protected:
 
 private:
     CEMConfig cem_config_;
-    
+
     std::vector<float> mean_;
     std::vector<float> stddev_;
     std::vector<std::mt19937> rngs_;
 };
 
-} // namespace algs
-} // namespace spc
+}  // namespace algs
+}  // namespace spc

@@ -1,8 +1,10 @@
 #pragma once
 
-#include "spc/core/task.h"
 #include <mujoco/mujoco.h>
+
 #include <cmath>
+
+#include "spc/core/task.h"
 
 namespace spc {
 namespace tasks {
@@ -31,9 +33,9 @@ public:
 
 private:
     // Sensor addresses
-    int pelvis_gyro_adr_;       // gyro_pelvis sensor address (3)
-    int pelvis_linvel_adr_;     // local_linvel_pelvis sensor address (3)
-    int pelvis_imu_site_id_;    // pelvis IMU site for gravity projection
+    int pelvis_gyro_adr_;     // gyro_pelvis sensor address (3)
+    int pelvis_linvel_adr_;   // local_linvel_pelvis sensor address (3)
+    int pelvis_imu_site_id_;  // pelvis IMU site for gravity projection
 
     // Body/site IDs
     int torso_site_id_;
@@ -44,7 +46,7 @@ private:
     // Action scale from environment config
     float action_scale_;
     float gait_freq_;
-    
+
     double target_height_;
     double pos_weight_;
     double ori_weight_;
@@ -57,5 +59,5 @@ private:
     float jnt_range_high_[29];
 };
 
-} // namespace tasks
-} // namespace spc
+}  // namespace tasks
+}  // namespace spc

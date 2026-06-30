@@ -1,10 +1,12 @@
 #pragma once
 
 #include <mujoco/mujoco.h>
-#include "spc/core/task.h"
-#include "spc/core/policy.h"
+
 #include <memory>
 #include <vector>
+
+#include "spc/core/policy.h"
+#include "spc/core/task.h"
 
 namespace spc {
 namespace algs {
@@ -19,8 +21,8 @@ struct OptimizerConfig {
     int plan_horizon_steps = 25;
     int sim_substeps = 4;
     int control_dim = 1;
-    int obs_dim = 1; // Size of the observation array
-    int num_threads = 8; // Number of OpenMP threads to use
+    int obs_dim = 1;      // Size of the observation array
+    int num_threads = 8;  // Number of OpenMP threads to use
 };
 
 /**
@@ -31,9 +33,7 @@ struct OptimizerConfig {
  */
 class Optimizer {
 public:
-    Optimizer(mjModel* model, 
-              std::shared_ptr<core::Task> task,
-              std::shared_ptr<core::Policy> policy,
+    Optimizer(mjModel* model, std::shared_ptr<core::Task> task, std::shared_ptr<core::Policy> policy,
               const OptimizerConfig& config);
 
     virtual ~Optimizer();
@@ -42,7 +42,7 @@ public:
      * @brief Get the configured control dimension.
      */
     int GetControlDim() const { return config_.control_dim; }
-    
+
     /**
      * @brief Get the associated task.
      */
@@ -64,9 +64,9 @@ protected:
     std::shared_ptr<core::Task> task_;
     std::shared_ptr<core::Policy> policy_;
     OptimizerConfig config_;
-    
+
     std::vector<mjData*> thread_datas_;
 };
 
-} // namespace algs
-} // namespace spc
+}  // namespace algs
+}  // namespace spc

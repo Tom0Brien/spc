@@ -8,5 +8,5 @@ TaskFactory& TaskFactory::GetInstance() {
     return instance;
 }
 
-} // namespace core
-} // namespace spc
+}  // namespace core
+}  // namespace spc

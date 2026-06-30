@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
 #include <mujoco/mujoco.h>
+
 #include "spc/algs/cem.h"
-#include "spc/core/task.h"
 #include "spc/core/policy.h"
+#include "spc/core/task.h"
 
 using namespace spc;
 
@@ -17,7 +18,7 @@ public:
 class QuadraticTask : public core::Task {
 public:
     void GetObservation(const mjModel* model, const mjData* data, float* obs_out) const override {}
-    double RunningCost(const mjModel* model, const mjData* data, const float* control) const override { 
+    double RunningCost(const mjModel* model, const mjData* data, const float* control) const override {
         // Cost is simply (u - 0.5)^2 for the single actuator
         double diff = control[0] - 0.5;
         return diff * diff;
@@ -45,7 +46,7 @@ TEST(CEMTest, Initialization) {
             <motor joint="j" ctrlrange="-1 1"/>
         </actuator>
     </mujoco>)";
-    
+
     const char* filename = "/tmp/dummy_model.xml";
     FILE* fp = fopen(filename, "w");
     fputs(xml, fp);
@@ -58,7 +59,7 @@ TEST(CEMTest, Initialization) {
     auto task = std::make_shared<DummyTask>();
     auto policy = std::make_shared<DummyPolicy>();
     algs::CEMConfig config;
-    config.num_samples = 4; // Keep small for basic testing
+    config.num_samples = 4;  // Keep small for basic testing
 
     // Initialize the optimizer
     algs::CEM cem(m, task, policy, config);
@@ -66,10 +67,10 @@ TEST(CEMTest, Initialization) {
     // Run optimization
     std::vector<float> best_action(config.control_dim, 0.0f);
     mjData* current_state = mj_makeData(m);
-    
+
     // Optimize should execute the multi-threaded rollout loop
     ASSERT_NO_THROW(cem.Optimize(current_state, best_action.data()));
-    
+
     mj_deleteData(current_state);
     mj_deleteModel(m);
 }
@@ -98,12 +99,12 @@ TEST(CEMTest, QuadraticOptimization) {
 
     auto task = std::make_shared<QuadraticTask>();
     auto policy = std::make_shared<DummyPolicy>();
-    
+
     algs::CEMConfig config;
     config.num_samples = 256;
     config.num_elites = 24;
     config.num_knots = 4;
-    config.num_iterations = 5; // Enough iterations to converge to 0.5
+    config.num_iterations = 5;  // Enough iterations to converge to 0.5
     config.plan_horizon_steps = 10;
     config.control_dim = 1;
     config.sigma_init = 0.5f;
@@ -112,12 +113,12 @@ TEST(CEMTest, QuadraticOptimization) {
 
     std::vector<float> best_action(config.control_dim, 0.0f);
     mjData* current_state = mj_makeData(m);
-    
+
     cem.Optimize(current_state, best_action.data());
-    
+
     // We expect the optimal action to be close to 0.5
     EXPECT_NEAR(best_action[0], 0.5f, 0.05f);
-    
+
     mj_deleteData(current_state);
     mj_deleteModel(m);
 }

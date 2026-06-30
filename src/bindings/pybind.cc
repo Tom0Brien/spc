@@ -1,18 +1,18 @@
+#include <mujoco/mujoco.h>
+#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <pybind11/numpy.h>
 
-#include "spc/algs/optimizer.h"
 #include "spc/algs/cem.h"
-#include "spc/core/task_factory.h"
+#include "spc/algs/optimizer.h"
 #include "spc/core/policy.h"
 #include "spc/core/task.h"
-#include <mujoco/mujoco.h>
+#include "spc/core/task_factory.h"
 
 namespace py = pybind11;
 
-// Since passing mjModel/mjData pointers between Python's mujoco package and C++ is tricky 
-// (though possible via ctypes), we create a lightweight C++ environment that owns 
+// Since passing mjModel/mjData pointers between Python's mujoco package and C++ is tricky
+// (though possible via ctypes), we create a lightweight C++ environment that owns
 // its own C++ mjModel and mjData. We sync states back to Python for rendering.
 class SpcEnv {
 public:
@@ -27,27 +27,29 @@ public:
             mj_resetDataKeyframe(m_, d_, 0);
         }
     }
-    
+
     SpcEnv(uintptr_t model_ptr, uintptr_t data_ptr) : owns_data_(false) {
         m_ = reinterpret_cast<mjModel*>(model_ptr);
         d_ = reinterpret_cast<mjData*>(data_ptr);
     }
-    
+
     ~SpcEnv() {
         if (owns_data_) {
-            if (d_) mj_deleteData(d_);
-            if (m_) mj_deleteModel(m_);
+            if (d_)
+                mj_deleteData(d_);
+            if (m_)
+                mj_deleteModel(m_);
         }
     }
-    
+
     mjModel* GetModel() { return m_; }
     mjData* GetData() { return d_; }
-    
+
     void StepMPC(std::shared_ptr<spc::algs::Optimizer> optimizer, int sim_steps_per_replan) {
         int ctrl_dim = optimizer->GetControlDim();
         std::vector<float> best_action(ctrl_dim);
         optimizer->Optimize(d_, best_action.data());
-        
+
         auto task = optimizer->GetTask();
         if (task) {
             task->ApplyControl(m_, d_, best_action.data());
@@ -56,55 +58,51 @@ public:
                 d_->ctrl[i] = best_action[i];
             }
         }
-        
+
         for (int step = 0; step < sim_steps_per_replan; ++step) {
             mj_step(m_, d_);
         }
     }
-    
+
     void SetMocapPos(int mocap_id, py::array_t<double> pos) {
         auto r = pos.unchecked<1>();
         for (int i = 0; i < 3 && i < r.shape(0); ++i) {
             d_->mocap_pos[3 * mocap_id + i] = r(i);
         }
     }
-    
+
     void SetMocapQuat(int mocap_id, py::array_t<double> quat) {
         auto r = quat.unchecked<1>();
         for (int i = 0; i < 4 && i < r.shape(0); ++i) {
             d_->mocap_quat[4 * mocap_id + i] = r(i);
         }
     }
-    
+
     void SetQpos(py::array_t<double> qpos) {
         auto r = qpos.unchecked<1>();
         for (int i = 0; i < m_->nq && i < r.shape(0); ++i) {
             d_->qpos[i] = r(i);
         }
     }
-    
+
     void SetQvel(py::array_t<double> qvel) {
         auto r = qvel.unchecked<1>();
         for (int i = 0; i < m_->nv && i < r.shape(0); ++i) {
             d_->qvel[i] = r(i);
         }
     }
-    
+
     void SetCtrl(py::array_t<double> ctrl) {
         auto r = ctrl.unchecked<1>();
         for (int i = 0; i < m_->nu && i < r.shape(0); ++i) {
             d_->ctrl[i] = r(i);
         }
     }
-    
-    void Forward() {
-        mj_forward(m_, d_);
-    }
-    
-    py::array_t<double> GetQpos() {
-        return py::array_t<double>(m_->nq, d_->qpos);
-    }
-    
+
+    void Forward() { mj_forward(m_, d_); }
+
+    py::array_t<double> GetQpos() { return py::array_t<double>(m_->nq, d_->qpos); }
+
     int GetNu() { return m_->nu; }
 
 private:
@@ -115,7 +113,9 @@ private:
 
 #include "spc/core/onnx_policy.h"
 
-std::shared_ptr<spc::algs::Optimizer> MakeCEM(SpcEnv& env, std::shared_ptr<spc::core::Task> task, std::shared_ptr<spc::core::Policy> policy, const spc::algs::CEMConfig& config) {
+std::shared_ptr<spc::algs::Optimizer> MakeCEM(SpcEnv& env, std::shared_ptr<spc::core::Task> task,
+                                              std::shared_ptr<spc::core::Policy> policy,
+                                              const spc::algs::CEMConfig& config) {
     return std::make_shared<spc::algs::CEM>(env.GetModel(), task, policy, config);
 }
 
@@ -134,28 +134,34 @@ PYBIND11_MODULE(spc_py, m) {
         .def_property_readonly("nu", &SpcEnv::GetNu);
 
     py::class_<spc::core::Task, std::shared_ptr<spc::core::Task>>(m, "Task")
-        .def("get_observation", [](std::shared_ptr<spc::core::Task> task, SpcEnv& env, int obs_dim) {
-            std::vector<float> obs(obs_dim, 0.0f);
-            task->GetObservation(env.GetModel(), env.GetData(), obs.data());
-            return py::array_t<float>(obs.size(), obs.data());
-        })
+        .def("get_observation",
+             [](std::shared_ptr<spc::core::Task> task, SpcEnv& env, int obs_dim) {
+                 std::vector<float> obs(obs_dim, 0.0f);
+                 task->GetObservation(env.GetModel(), env.GetData(), obs.data());
+                 return py::array_t<float>(obs.size(), obs.data());
+             })
         .def("running_cost", [](std::shared_ptr<spc::core::Task> task, SpcEnv& env, py::array_t<float> control) {
             auto r = control.unchecked<1>();
             std::vector<float> ctrl(r.shape(0));
-            for (int i = 0; i < r.shape(0); ++i) ctrl[i] = r(i);
+            for (int i = 0; i < r.shape(0); ++i)
+                ctrl[i] = r(i);
             return task->RunningCost(env.GetModel(), env.GetData(), ctrl.data());
         });
 
-    m.def("create_task", [](const std::string& name, SpcEnv& env, py::dict num_params, py::dict str_params) {
-        spc::core::TaskConfig config;
-        for (auto item : num_params) {
-            config.numeric_params[py::cast<std::string>(item.first)] = py::cast<double>(item.second);
-        }
-        for (auto item : str_params) {
-            config.string_params[py::cast<std::string>(item.first)] = py::cast<std::string>(item.second);
-        }
-        return spc::core::TaskFactory::GetInstance().Create(name, env.GetModel(), config);
-    }, "Create a registered task by name", py::arg("name"), py::arg("env"), py::arg("numeric_params") = py::dict(), py::arg("string_params") = py::dict());
+    m.def(
+        "create_task",
+        [](const std::string& name, SpcEnv& env, py::dict num_params, py::dict str_params) {
+            spc::core::TaskConfig config;
+            for (auto item : num_params) {
+                config.numeric_params[py::cast<std::string>(item.first)] = py::cast<double>(item.second);
+            }
+            for (auto item : str_params) {
+                config.string_params[py::cast<std::string>(item.first)] = py::cast<std::string>(item.second);
+            }
+            return spc::core::TaskFactory::GetInstance().Create(name, env.GetModel(), config);
+        },
+        "Create a registered task by name", py::arg("name"), py::arg("env"), py::arg("numeric_params") = py::dict(),
+        py::arg("string_params") = py::dict());
 
     py::class_<spc::core::Policy, std::shared_ptr<spc::core::Policy>>(m, "Policy");
 
@@ -178,6 +184,7 @@ PYBIND11_MODULE(spc_py, m) {
         .def_readwrite("num_threads", &spc::algs::CEMConfig::num_threads);
 
     py::class_<spc::algs::Optimizer, std::shared_ptr<spc::algs::Optimizer>>(m, "Optimizer");
-    
-    m.def("CEM", &MakeCEM, "Create a CEM optimizer", py::arg("env"), py::arg("task"), py::arg("policy"), py::arg("config"));
+
+    m.def("CEM", &MakeCEM, "Create a CEM optimizer", py::arg("env"), py::arg("task"), py::arg("policy"),
+          py::arg("config"));
 }

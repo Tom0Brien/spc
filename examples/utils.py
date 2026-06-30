@@ -1,8 +1,10 @@
-import time
 import sys
+import time
+
 import mujoco
 import mujoco.viewer
 import numpy as np
+
 
 def init_env_state(m_py, d_py, env, keyframe_name="knees_bent", mocap_defaults=None):
     """Generically initialize the environment to a keyframe and sync to C++."""
@@ -10,7 +12,7 @@ def init_env_state(m_py, d_py, env, keyframe_name="knees_bent", mocap_defaults=N
     if m_py.nkey > 0:
         key_id = mujoco.mj_name2id(m_py, mujoco.mjtObj.mjOBJ_KEY, keyframe_name)
         if key_id < 0:
-            key_id = 0 # Default to first keyframe
+            key_id = 0  # Default to first keyframe
         mujoco.mj_resetDataKeyframe(m_py, d_py, key_id)
     else:
         mujoco.mj_resetData(m_py, d_py)
@@ -30,11 +32,11 @@ def init_env_state(m_py, d_py, env, keyframe_name="knees_bent", mocap_defaults=N
     env.set_qpos(d_py.qpos)
     env.set_qvel(d_py.qvel)
     env.set_ctrl(d_py.ctrl)
-    
+
     for i in range(m_py.nmocap):
         env.set_mocap_pos(i, d_py.mocap_pos[i])
         env.set_mocap_quat(i, d_py.mocap_quat[i])
-        
+
     env.forward()
 
 
@@ -42,43 +44,43 @@ def run_interactive(env, optimizer, model_path, sim_dt=0.02, sim_steps_per_repla
     """Generic interactive simulation loop for SPC tasks."""
     print("Starting interactive simulation...")
     print("Double click the target/goal marker and right-click drag to move it.")
-    
+
     m_py = mujoco.MjModel.from_xml_path(model_path)
     d_py = mujoco.MjData(m_py)
-    
+
     init_kwargs = init_kwargs or {}
     custom_init_fn = init_kwargs.pop("custom_init_fn", None)
     if custom_init_fn:
         custom_init_fn(m_py, d_py, env)
     else:
         init_env_state(m_py, d_py, env, **init_kwargs)
-    
+
     with mujoco.viewer.launch_passive(m_py, d_py) as viewer:
         while viewer.is_running():
             step_start = time.time()
-            
+
             # Read all mocap bodies from Python viewer and send to C++ SpcEnv
             for i in range(m_py.nmocap):
                 env.set_mocap_pos(i, np.array(d_py.mocap_pos[i]))
                 env.set_mocap_quat(i, np.array(d_py.mocap_quat[i]))
-            
+
             # Step C++ MPC and simulation
             compute_start = time.time()
             env.step_mpc(optimizer, sim_steps_per_replan)
             compute_time = time.time() - compute_start
-            
+
             # Sync back to Python viewer
             d_py.qpos[:] = env.get_qpos()
             mujoco.mj_forward(m_py, d_py)
             viewer.sync()
-            
+
             # Real-time pacing
             elapsed_compute = time.time() - step_start
             time_until_next_step = sim_dt - elapsed_compute
             if time_until_next_step > 0:
                 time.sleep(time_until_next_step)
-                
+
             total_elapsed = time.time() - step_start
             rtf = sim_dt / total_elapsed if total_elapsed > 0 else 0.0
-            sys.stdout.write(f"\rRealtime rate: {rtf:.2f}x | Compute time: {compute_time*1000:.2f}ms   ")
+            sys.stdout.write(f"\rRealtime rate: {rtf:.2f}x | Compute time: {compute_time * 1000:.2f}ms   ")
             sys.stdout.flush()

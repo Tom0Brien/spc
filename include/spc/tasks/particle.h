@@ -1,7 +1,8 @@
 #pragma once
 
-#include "spc/core/task.h"
 #include <mujoco/mujoco.h>
+
+#include "spc/core/task.h"
 
 namespace spc {
 namespace tasks {
@@ -22,5 +23,5 @@ private:
     double ctrl_weight_;
 };
 
-} // namespace tasks
-} // namespace spc
+}  // namespace tasks
+}  // namespace spc

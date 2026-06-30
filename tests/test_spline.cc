@@ -1,13 +1,15 @@
-#include "spc/utils/spline.h"
 #include <gtest/gtest.h>
+
 #include <vector>
+
+#include "spc/utils/spline.h"
 
 using namespace spc::utils;
 
 TEST(SplineTest, InterpLinear_ZeroOrder) {
     int nu = 1;
     int num_knots = 1;
-    std::vector<float> knots = { 1.5f };
+    std::vector<float> knots = {1.5f};
     std::vector<float> out(nu);
 
     InterpLinear(nu, num_knots, knots.data(), 0, 5, out.data());
@@ -20,9 +22,9 @@ TEST(SplineTest, InterpLinear_ZeroOrder) {
 TEST(SplineTest, InterpLinear_MultiKnot) {
     int nu = 1;
     int num_knots = 3;
-    std::vector<float> knots = { 0.0f, 1.0f, 2.0f };
+    std::vector<float> knots = {0.0f, 1.0f, 2.0f};
     std::vector<float> out(nu);
-    int horizon = 5; // step 0, 1, 2, 3, 4
+    int horizon = 5;  // step 0, 1, 2, 3, 4
 
     // t = 0 / 4 = 0.0 -> knot idx 0.0 -> knot[0]
     InterpLinear(nu, num_knots, knots.data(), 0, horizon, out.data());
@@ -49,9 +51,9 @@ TEST(SplineTest, InterpLinear_MultiDim) {
     int nu = 2;
     int num_knots = 2;
     // Knot 0: (0, 10), Knot 1: (10, 20)
-    std::vector<float> knots = { 0.0f, 10.0f, 10.0f, 20.0f };
+    std::vector<float> knots = {0.0f, 10.0f, 10.0f, 20.0f};
     std::vector<float> out(nu);
-    int horizon = 3; // step 0, 1, 2
+    int horizon = 3;  // step 0, 1, 2
 
     // step 0 (t=0)
     InterpLinear(nu, num_knots, knots.data(), 0, horizon, out.data());

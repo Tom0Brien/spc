@@ -1,4 +1,5 @@
 #include "spc/tasks/g1_navigation.h"
+
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -7,10 +8,14 @@ namespace spc {
 namespace tasks {
 
 G1Navigation::G1Navigation(mjModel* model, const spc::core::TaskConfig& config) {
-    std::string gyro_name = config.string_params.count("gyro_name") ? config.string_params.at("gyro_name") : "gyro_pelvis";
-    std::string linvel_name = config.string_params.count("linvel_name") ? config.string_params.at("linvel_name") : "local_linvel_pelvis";
-    std::string pelvis_imu = config.string_params.count("pelvis_imu") ? config.string_params.at("pelvis_imu") : "imu_in_pelvis";
-    std::string torso_imu = config.string_params.count("torso_imu") ? config.string_params.at("torso_imu") : "imu_in_torso";
+    std::string gyro_name =
+        config.string_params.count("gyro_name") ? config.string_params.at("gyro_name") : "gyro_pelvis";
+    std::string linvel_name =
+        config.string_params.count("linvel_name") ? config.string_params.at("linvel_name") : "local_linvel_pelvis";
+    std::string pelvis_imu =
+        config.string_params.count("pelvis_imu") ? config.string_params.at("pelvis_imu") : "imu_in_pelvis";
+    std::string torso_imu =
+        config.string_params.count("torso_imu") ? config.string_params.at("torso_imu") : "imu_in_torso";
 
     int gyro_id = mj_name2id(model, mjOBJ_SENSOR, gyro_name.c_str());
     int linvel_id = mj_name2id(model, mjOBJ_SENSOR, linvel_name.c_str());
@@ -24,16 +29,19 @@ G1Navigation::G1Navigation(mjModel* model, const spc::core::TaskConfig& config) 
     // Default pose from mujoco_playground G1JoystickFlatTerrain
     // These are the default joint positions the RL policy was trained with
     const float dp[29] = {
-        -0.312f, 0.0f, 0.0f, 0.669f, -0.363f, 0.0f,     // left leg (6)
-        -0.312f, 0.0f, 0.0f, 0.669f, -0.363f, 0.0f,     // right leg (6)
-        0.0f, 0.0f, 0.073f,                               // waist (3)
-        0.2f, 0.2f, 0.0f, 0.6f, 0.0f, 0.0f, 0.0f,       // left arm (7)
-        0.2f, -0.2f, 0.0f, 0.6f, 0.0f, 0.0f, 0.0f       // right arm (7)
+        -0.312f, 0.0f,  0.0f,   0.669f, -0.363f, 0.0f,        // left leg (6)
+        -0.312f, 0.0f,  0.0f,   0.669f, -0.363f, 0.0f,        // right leg (6)
+        0.0f,    0.0f,  0.073f,                               // waist (3)
+        0.2f,    0.2f,  0.0f,   0.6f,   0.0f,    0.0f, 0.0f,  // left arm (7)
+        0.2f,    -0.2f, 0.0f,   0.6f,   0.0f,    0.0f, 0.0f   // right arm (7)
     };
     std::memcpy(default_pose_, dp, sizeof(dp));
 
-    action_scale_ = config.numeric_params.count("action_scale") ? static_cast<float>(config.numeric_params.at("action_scale")) : 0.5f;
-    gait_freq_ = config.numeric_params.count("gait_freq") ? static_cast<float>(config.numeric_params.at("gait_freq")) : 1.5f;
+    action_scale_ = config.numeric_params.count("action_scale")
+                        ? static_cast<float>(config.numeric_params.at("action_scale"))
+                        : 0.5f;
+    gait_freq_ =
+        config.numeric_params.count("gait_freq") ? static_cast<float>(config.numeric_params.at("gait_freq")) : 1.5f;
     target_height_ = config.numeric_params.count("target_height") ? config.numeric_params.at("target_height") : 0.75;
 
     pos_weight_ = config.numeric_params.count("pos_weight") ? config.numeric_params.at("pos_weight") : 1.0;
@@ -57,7 +65,8 @@ void G1Navigation::GetObservation(const mjModel* model, const mjData* data, floa
         for (int i = 0; i < 3; ++i)
             obs_out[idx++] = static_cast<float>(data->sensordata[pelvis_linvel_adr_ + i]);
     } else {
-        for (int i = 0; i < 3; ++i) obs_out[idx++] = 0.0f;
+        for (int i = 0; i < 3; ++i)
+            obs_out[idx++] = 0.0f;
     }
 
     // 2. Gyro (angular velocity) of pelvis (3)
@@ -65,7 +74,8 @@ void G1Navigation::GetObservation(const mjModel* model, const mjData* data, floa
         for (int i = 0; i < 3; ++i)
             obs_out[idx++] = static_cast<float>(data->sensordata[pelvis_gyro_adr_ + i]);
     } else {
-        for (int i = 0; i < 3; ++i) obs_out[idx++] = 0.0f;
+        for (int i = 0; i < 3; ++i)
+            obs_out[idx++] = 0.0f;
     }
 
     // 3. Gravity vector in pelvis frame (3)
@@ -85,7 +95,8 @@ void G1Navigation::GetObservation(const mjModel* model, const mjData* data, floa
 
     // 4. Command (3) - stored in obs slots, will be filled by ApplyControl
     // For GetObservation, we use zeros (the actual command comes from the MPC control)
-    for (int i = 0; i < 3; ++i) obs_out[idx++] = 0.0f;
+    for (int i = 0; i < 3; ++i)
+        obs_out[idx++] = 0.0f;
 
     // 5. Joint angles - default_pose (29)
     // Robot joints are qpos[7:36]
@@ -118,8 +129,8 @@ void G1Navigation::GetObservation(const mjModel* model, const mjData* data, floa
 
 double G1Navigation::RunningCost(const mjModel* model, const mjData* data, const float* control) const {
     // Goal from mocap body 0
-    const mjtNum* goal_pos = data->mocap_pos;     // x, y, z
-    const mjtNum* goal_quat = data->mocap_quat;   // w, x, y, z
+    const mjtNum* goal_pos = data->mocap_pos;    // x, y, z
+    const mjtNum* goal_quat = data->mocap_quat;  // w, x, y, z
 
     // Robot position (x, y from floating base)
     double robot_x = data->qpos[0];
@@ -138,7 +149,7 @@ double G1Navigation::RunningCost(const mjModel* model, const mjData* data, const
     mju_negQuat(goal_inv, goal_quat);
     mjtNum quat_diff[4];
     mju_mulQuat(quat_diff, robot_quat, goal_inv);
-    double orientation_cost = quat_diff[3] * quat_diff[3]; // qz^2
+    double orientation_cost = quat_diff[3] * quat_diff[3];  // qz^2
 
     // Upright cost: penalize tilt from vertical
     // Use pelvis orientation to check uprightness
@@ -167,11 +178,8 @@ double G1Navigation::RunningCost(const mjModel* model, const mjData* data, const
         ctrl_cost += control[i] * control[i];
     }
 
-    return pos_weight_ * position_cost + 
-           ori_weight_ * orientation_cost + 
-           upright_weight_ * upright_cost + 
-           height_weight_ * height_cost + 
-           ctrl_weight_ * ctrl_cost;
+    return pos_weight_ * position_cost + ori_weight_ * orientation_cost + upright_weight_ * upright_cost +
+           height_weight_ * height_cost + ctrl_weight_ * ctrl_cost;
 }
 
 double G1Navigation::TerminalCost(const mjModel* model, const mjData* data) const {
@@ -183,7 +191,7 @@ void G1Navigation::ApplyControl(const mjModel* model, mjData* data, const float*
     // action[0:3] = velocity command (vx, vy, vtheta)
 
     // Build the 103-dim observation with the velocity command inserted
-    float obs[128]; // 103 needed, use 128 for alignment
+    float obs[128];  // 103 needed, use 128 for alignment
     GetObservation(model, data, obs);
     // Overwrite the command slots (indices 9, 10, 11)
     obs[9] = action[0];
@@ -191,11 +199,12 @@ void G1Navigation::ApplyControl(const mjModel* model, mjData* data, const float*
     obs[11] = action[2];
 
     // Run ONNX policy to get 29 motor actions
-    float policy_action[32]; // 29 needed
+    float policy_action[32];  // 29 needed
     if (policy_) {
         policy_->ComputeAction(obs, 103, policy_action, 29);
     } else {
-        for (int i = 0; i < 29; ++i) policy_action[i] = 0.0f;
+        for (int i = 0; i < 29; ++i)
+            policy_action[i] = 0.0f;
     }
 
     // Convert policy output to motor targets: default_pose + action * scale
@@ -203,15 +212,17 @@ void G1Navigation::ApplyControl(const mjModel* model, mjData* data, const float*
         float motor_target = default_pose_[i] + policy_action[i] * action_scale_;
 
         // Clamp to joint limits
-        if (motor_target < jnt_range_low_[i]) motor_target = jnt_range_low_[i];
-        if (motor_target > jnt_range_high_[i]) motor_target = jnt_range_high_[i];
+        if (motor_target < jnt_range_low_[i])
+            motor_target = jnt_range_low_[i];
+        if (motor_target > jnt_range_high_[i])
+            motor_target = jnt_range_high_[i];
 
         data->ctrl[i] = motor_target;
     }
 }
 
-} // namespace tasks
-} // namespace spc
+}  // namespace tasks
+}  // namespace spc
 
 #include "spc/core/task_factory.h"
 REGISTER_TASK("G1Navigation", spc::tasks::G1Navigation, G1Navigation)
