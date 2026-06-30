@@ -24,10 +24,6 @@ import mujoco.viewer
 import spc_py
 from utils import run_interactive
 
-
-
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--no_policy", action="store_true", help="Run without ONNX policy")
@@ -39,7 +35,18 @@ def main():
     print(f"Loading model from {model_path}")
     env = spc_py.SpcEnv(model_path)
     
-    task = spc_py.create_task("G1Navigation", env)
+    # You can now configure the C++ task dynamically from Python!
+    task_params = {
+        "action_scale": 0.5,
+        "gait_freq": 1.5,
+        "target_height": 0.75,
+        "pos_weight": 1.0,
+        "ori_weight": 1.0,
+        "upright_weight": 2.0,
+        "height_weight": 0.5,
+        "ctrl_weight": 0.01
+    }
+    task = spc_py.create_task("G1Navigation", env, task_params)
     
     policy = None
     if not args.no_policy:

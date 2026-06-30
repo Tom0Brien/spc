@@ -17,8 +17,13 @@ def main():
     # Initialize the C++ environment
     env = spc_py.SpcEnv(model_path)
     
-    # Instantiate the Particle task
-    task = spc_py.create_task("ParticleTask", env)
+    # You can now configure the C++ task dynamically from Python!
+    task_params = {
+        "pos_weight": 5.0,
+        "vel_weight": 0.1,
+        "ctrl_weight": 0.1
+    }
+    task = spc_py.create_task("ParticleTask", env, task_params)
     
     # Configure and create CEM optimizer
     config = spc_py.CEMConfig()

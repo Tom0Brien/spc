@@ -108,7 +108,15 @@ def main():
     print(f"Loading model from {model_path}")
     env = spc_py.SpcEnv(model_path)
     
-    task = spc_py.create_task("FrankaPushTask", env)
+    # You can now configure the C++ task dynamically from Python!
+    task_params = {
+        "obj_target_weight": 10.0,
+        "gripper_obj_weight": 5.0,
+        "orientation_weight": 1.0,
+        "residual_weight": 0.1,
+        "action_scale": 0.1,
+    }
+    task = spc_py.create_task("FrankaPushTask", env, task_params)
     
     policy = None
     if not args.no_policy:
