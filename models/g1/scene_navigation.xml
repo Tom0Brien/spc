@@ -1,10 +1,6 @@
 <mujoco model="g1 navigation scene">
   <include file="g1.xml"/>
 
-  <!-- <option timestep="0.002" iterations="10" ls_iterations="10" integrator="implicitfast">
-    <flag eulerdamp="disable"/> -->
-  <!-- </option> -->
-
   <option iterations="3" ls_iterations="5" timestep=".002" integrator="Euler">
     <flag eulerdamp="disable"/>
   </option>

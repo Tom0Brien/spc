@@ -63,10 +63,10 @@ def main():
 
     config = spc_py.CEMConfig()
     config.num_samples = 32
-    config.num_elites = 8
-    config.num_knots = 5
-    config.num_iterations = 2
-    config.plan_horizon_steps = 25
+    config.num_elites = 4
+    config.num_knots = 4
+    config.num_iterations = 1
+    config.plan_horizon_steps = 100
     config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps
     config.control_dim = 3  # vx, vy, vtheta
     config.obs_dim = 103
@@ -77,13 +77,37 @@ def main():
 
     cem = spc_py.CEM(env, task, policy, config)
 
+    def custom_init(m_py, d_py, spc_env):
+        import mujoco
+        from utils import init_env_state
+        init_env_state(m_py, d_py, spc_env, keyframe_name="knees_bent")
+        
+        # Set soccer ball initial position
+        ball_id = mujoco.mj_name2id(m_py, mujoco.mjtObj.mjOBJ_BODY, "soccer_ball")
+        if ball_id != -1:
+            jnt_id = m_py.body_jntadr[ball_id]
+            qpos_adr = m_py.jnt_qposadr[jnt_id]
+            d_py.qpos[qpos_adr:qpos_adr+3] = [2.0, 0.5, 0.117]
+            d_py.qpos[qpos_adr+3:qpos_adr+7] = [1.0, 0.0, 0.0, 0.0]
+            
+        # Set goal position via mocap body
+        if m_py.nmocap > 0:
+            d_py.mocap_pos[0] = [4.75, 0.0, 0.05]
+            d_py.mocap_quat[0] = [1.0, 0.0, 0.0, 0.0]
+            
+        mujoco.mj_forward(m_py, d_py)
+        spc_env.set_qpos(d_py.qpos)
+        spc_env.set_mocap_pos(0, d_py.mocap_pos[0])
+        spc_env.set_mocap_quat(0, d_py.mocap_quat[0])
+        spc_env.forward()
+
     run_interactive(
         env,
         cem,
         model_path,
         sim_dt=0.02,
         sim_steps_per_replan=10,
-        init_kwargs={"keyframe_name": "knees_bent", "mocap_defaults": {0: ([2.0, 0.0, 0.05], [1.0, 0.0, 0.0, 0.0])}},
+        init_kwargs={"custom_init_fn": custom_init},
     )
 
 
