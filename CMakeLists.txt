@@ -88,7 +88,8 @@ target_include_directories(spc_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(spc_core PUBLIC OpenMP::OpenMP_CXX mujoco::mujoco onnxruntime)
-set_target_properties(spc_core PROPERTIES 
+target_compile_options(spc_core PRIVATE $<$<CONFIG:Release>:-O3 -march=native -funroll-loops>)
+set_target_properties(spc_core PROPERTIES
     INSTALL_RPATH "\$ORIGIN;\$ORIGIN/lib"
     INTERPROCEDURAL_OPTIMIZATION TRUE
 )

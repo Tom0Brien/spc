@@ -114,6 +114,7 @@ private:
     bool owns_data_;
 };
 
+#include "spc/core/mlp_policy.h"
 #include "spc/core/onnx_policy.h"
 
 std::shared_ptr<spc::algs::Optimizer> MakeCEM(SpcEnv& env, std::shared_ptr<spc::core::Task> task,
@@ -169,6 +170,9 @@ PYBIND11_MODULE(spc_py, m) {
     py::class_<spc::core::Policy, std::shared_ptr<spc::core::Policy>>(m, "Policy");
 
     py::class_<spc::core::ONNXPolicy, spc::core::Policy, std::shared_ptr<spc::core::ONNXPolicy>>(m, "ONNXPolicy")
+        .def(py::init<const std::string&>());
+
+    py::class_<spc::core::MLPPolicy, spc::core::Policy, std::shared_ptr<spc::core::MLPPolicy>>(m, "MLPPolicy")
         .def(py::init<const std::string&>());
 
     py::class_<spc::algs::CEMConfig>(m, "CEMConfig")

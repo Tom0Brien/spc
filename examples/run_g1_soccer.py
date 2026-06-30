@@ -28,7 +28,7 @@ def main():
     args = parser.parse_args()
 
     model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/g1/scene_soccer.xml"))
-    policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../policies/g1_navigation.onnx"))
+    policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../policies/g1_navigation.mlp"))
 
     print(f"Loading model from {model_path}")
     env = spc_py.SpcEnv(model_path)
@@ -44,7 +44,7 @@ def main():
         "ball_goal_weight": 1.0,
         "pos_weight": 0.3,
         "ori_weight": 0.2,
-        "height_weight": 0.5,
+        "height_weight": 1.0,
         "ctrl_weight": 0.01,
     }
     
@@ -55,10 +55,9 @@ def main():
     if not args.no_policy:
         if os.path.exists(policy_path):
             print(f"Loading policy from {policy_path}")
-            policy = spc_py.ONNXPolicy(policy_path)
+            policy = spc_py.MLPPolicy(policy_path)
         else:
             print(f"WARNING: Policy not found at {policy_path}")
-            print("Run 'python3 scripts/export_g1_onnx.py' first to export the policy.")
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
@@ -66,8 +65,8 @@ def main():
     config.num_elites = 4
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 100
-    config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps
+    config.plan_horizon_steps = 50
+    config.sim_substeps = 5  # dt=0.004, ctrl_dt=0.02 -> 5 substeps
     config.control_dim = 3  # vx, vy, vtheta
     config.obs_dim = 103
     config.num_threads = 8
@@ -106,7 +105,7 @@ def main():
         cem,
         model_path,
         sim_dt=0.02,
-        sim_steps_per_replan=10,
+        sim_steps_per_replan=5,
         init_kwargs={"custom_init_fn": custom_init},
     )
 

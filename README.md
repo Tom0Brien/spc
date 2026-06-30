@@ -34,6 +34,7 @@ Examples demonstrate the interactive planner loop for various tasks. They launch
 uv run examples/run_particle.py
 uv run examples/run_franka_push.py
 uv run examples/run_g1_navigation.py
+uv run examples/run_g1_soccer.py
 ```
 
 ## Development
