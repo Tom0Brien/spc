@@ -1,6 +1,4 @@
 cmake_minimum_required(VERSION 3.20)
-set(CMAKE_C_COMPILER clang)
-set(CMAKE_CXX_COMPILER clang++)
 project(spc VERSION 0.1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -33,7 +31,8 @@ find_package(GTest)
 if(NOT GTEST_FOUND)
   FetchContent_Declare(
     googletest
-    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG        v1.14.0
   )
   set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(googletest)
@@ -69,33 +68,29 @@ set_target_properties(onnxruntime PROPERTIES
 # -----------------------------------------------------------------------------
 # Core C++ Library
 # -----------------------------------------------------------------------------
-add_library(spc_core SHARED
-    src/utils/spline.cc
-    src/algs/optimizer.cc
-    src/algs/cem.cc
-    src/tasks/particle.cc
-    src/tasks/franka_push.cc
-    src/tasks/g1_navigation.cc
-    src/core/onnx_policy.cc
-    src/core/task_factory.cc
-)
+file(GLOB_RECURSE SPC_CORE_SOURCES CONFIGURE_DEPENDS "src/*.cc")
+list(FILTER SPC_CORE_SOURCES EXCLUDE REGEX "src/bindings/.*")
+
+add_library(spc_core SHARED ${SPC_CORE_SOURCES})
 target_include_directories(spc_core PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(spc_core PUBLIC OpenMP::OpenMP_CXX mujoco::mujoco onnxruntime)
-target_compile_options(spc_core PRIVATE -O3 -march=native -flto)
-target_link_options(spc_core PRIVATE -O3 -march=native -flto)
-set_target_properties(spc_core PROPERTIES INSTALL_RPATH "\$ORIGIN;\$ORIGIN/lib")
+set_target_properties(spc_core PROPERTIES 
+    INSTALL_RPATH "\$ORIGIN;\$ORIGIN/lib"
+    INTERPROCEDURAL_OPTIMIZATION TRUE
+)
 
 # -----------------------------------------------------------------------------
 # Python Bindings
 # -----------------------------------------------------------------------------
 pybind11_add_module(spc_py src/bindings/pybind.cc)
 target_link_libraries(spc_py PRIVATE spc_core)
-target_compile_options(spc_py PRIVATE -O3 -march=native -flto)
-target_link_options(spc_py PRIVATE -O3 -march=native -flto)
-set_target_properties(spc_py PROPERTIES INSTALL_RPATH "\$ORIGIN;\$ORIGIN/lib")
+set_target_properties(spc_py PROPERTIES 
+    INSTALL_RPATH "\$ORIGIN;\$ORIGIN/lib"
+    INTERPROCEDURAL_OPTIMIZATION TRUE
+)
 
 # -----------------------------------------------------------------------------
 # Testing
