@@ -22,6 +22,11 @@ private:
     int gripper_site_;
     int mocap_target_;
     float action_scale_;
+    
+    double obj_target_weight_;
+    double gripper_obj_weight_;
+    double orientation_weight_;
+    double residual_weight_;
 };
 
 } // namespace tasks

@@ -43,9 +43,14 @@ private:
 
     // Action scale from environment config
     float action_scale_;
-
-    // Gait phase tracking (mutable since it changes with time)
     float gait_freq_;
+    
+    double target_height_;
+    double pos_weight_;
+    double ori_weight_;
+    double upright_weight_;
+    double height_weight_;
+    double ctrl_weight_;
 
     // Joint limits for clamping motor targets
     float jnt_range_low_[29];

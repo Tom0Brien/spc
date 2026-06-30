@@ -7,10 +7,18 @@ namespace spc {
 namespace tasks {
 
 FrankaPush::FrankaPush(mjModel* model, const spc::core::TaskConfig& config) {
-    obj_body_ = mj_name2id(model, mjOBJ_BODY, "box");
-    gripper_site_ = mj_name2id(model, mjOBJ_SITE, "gripper");
-    mocap_target_ = 0; // Assuming first mocap body is the target
-    action_scale_ = 0.1f;
+    std::string obj_name = config.string_params.count("obj_name") ? config.string_params.at("obj_name") : "box";
+    std::string gripper_name = config.string_params.count("gripper_name") ? config.string_params.at("gripper_name") : "gripper";
+    
+    obj_body_ = mj_name2id(model, mjOBJ_BODY, obj_name.c_str());
+    gripper_site_ = mj_name2id(model, mjOBJ_SITE, gripper_name.c_str());
+    mocap_target_ = config.numeric_params.count("mocap_target") ? static_cast<int>(config.numeric_params.at("mocap_target")) : 0;
+    action_scale_ = config.numeric_params.count("action_scale") ? static_cast<float>(config.numeric_params.at("action_scale")) : 0.1f;
+    
+    obj_target_weight_ = config.numeric_params.count("obj_target_weight") ? config.numeric_params.at("obj_target_weight") : 10.0;
+    gripper_obj_weight_ = config.numeric_params.count("gripper_obj_weight") ? config.numeric_params.at("gripper_obj_weight") : 5.0;
+    orientation_weight_ = config.numeric_params.count("orientation_weight") ? config.numeric_params.at("orientation_weight") : 1.0;
+    residual_weight_ = config.numeric_params.count("residual_weight") ? config.numeric_params.at("residual_weight") : 0.1;
 }
 
 void FrankaPush::GetObservation(const mjModel* model, const mjData* data, float* obs_out) const {
@@ -99,9 +107,12 @@ double FrankaPush::RunningCost(const mjModel* model, const mjData* data, const f
     for (int i = 0; i < 7; ++i) {
         residual_cost += control[i] * control[i];
     }
-    residual_cost *= 0.1;
+    residual_cost *= residual_weight_;
 
-    return 10.0 * obj_target_cost + 5.0 * gripper_obj_cost + 1.0 * orientation_cost + residual_cost;
+    return obj_target_weight_ * obj_target_cost + 
+           gripper_obj_weight_ * gripper_obj_cost + 
+           orientation_weight_ * orientation_cost + 
+           residual_cost;
 }
 
 double FrankaPush::TerminalCost(const mjModel* model, const mjData* data) const {

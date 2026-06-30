@@ -17,6 +17,9 @@ public:
 private:
     int pointmass_site_id_;
     int nu_;
+    double pos_weight_;
+    double vel_weight_;
+    double ctrl_weight_;
 };
 
 } // namespace tasks

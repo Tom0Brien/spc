@@ -7,20 +7,19 @@ namespace spc {
 namespace tasks {
 
 G1Navigation::G1Navigation(mjModel* model, const spc::core::TaskConfig& config) {
-    // Sensor addresses - look up by name
-    // The base G1 model has "gyro_pelvis" for gyro
-    int gyro_id = mj_name2id(model, mjOBJ_SENSOR, "gyro_pelvis");
-    // We add "local_linvel_pelvis" in scene_navigation.xml
-    int linvel_id = mj_name2id(model, mjOBJ_SENSOR, "local_linvel_pelvis");
+    std::string gyro_name = config.string_params.count("gyro_name") ? config.string_params.at("gyro_name") : "gyro_pelvis";
+    std::string linvel_name = config.string_params.count("linvel_name") ? config.string_params.at("linvel_name") : "local_linvel_pelvis";
+    std::string pelvis_imu = config.string_params.count("pelvis_imu") ? config.string_params.at("pelvis_imu") : "imu_in_pelvis";
+    std::string torso_imu = config.string_params.count("torso_imu") ? config.string_params.at("torso_imu") : "imu_in_torso";
+
+    int gyro_id = mj_name2id(model, mjOBJ_SENSOR, gyro_name.c_str());
+    int linvel_id = mj_name2id(model, mjOBJ_SENSOR, linvel_name.c_str());
 
     pelvis_gyro_adr_ = (gyro_id >= 0) ? model->sensor_adr[gyro_id] : -1;
     pelvis_linvel_adr_ = (linvel_id >= 0) ? model->sensor_adr[linvel_id] : -1;
 
-    // Pelvis IMU site for gravity projection
-    pelvis_imu_site_id_ = mj_name2id(model, mjOBJ_SITE, "imu_in_pelvis");
-
-    // Torso site for height tracking
-    torso_site_id_ = mj_name2id(model, mjOBJ_SITE, "imu_in_torso");
+    pelvis_imu_site_id_ = mj_name2id(model, mjOBJ_SITE, pelvis_imu.c_str());
+    torso_site_id_ = mj_name2id(model, mjOBJ_SITE, torso_imu.c_str());
 
     // Default pose from mujoco_playground G1JoystickFlatTerrain
     // These are the default joint positions the RL policy was trained with
@@ -33,8 +32,15 @@ G1Navigation::G1Navigation(mjModel* model, const spc::core::TaskConfig& config) 
     };
     std::memcpy(default_pose_, dp, sizeof(dp));
 
-    action_scale_ = 0.5f;
-    gait_freq_ = 1.5f;
+    action_scale_ = config.numeric_params.count("action_scale") ? static_cast<float>(config.numeric_params.at("action_scale")) : 0.5f;
+    gait_freq_ = config.numeric_params.count("gait_freq") ? static_cast<float>(config.numeric_params.at("gait_freq")) : 1.5f;
+    target_height_ = config.numeric_params.count("target_height") ? config.numeric_params.at("target_height") : 0.75;
+
+    pos_weight_ = config.numeric_params.count("pos_weight") ? config.numeric_params.at("pos_weight") : 1.0;
+    ori_weight_ = config.numeric_params.count("ori_weight") ? config.numeric_params.at("ori_weight") : 1.0;
+    upright_weight_ = config.numeric_params.count("upright_weight") ? config.numeric_params.at("upright_weight") : 2.0;
+    height_weight_ = config.numeric_params.count("height_weight") ? config.numeric_params.at("height_weight") : 0.5;
+    ctrl_weight_ = config.numeric_params.count("ctrl_weight") ? config.numeric_params.at("ctrl_weight") : 0.01;
 
     // Store joint limits (joints 1-29, skipping floating base joint 0)
     for (int i = 0; i < 29; ++i) {
@@ -151,7 +157,7 @@ double G1Navigation::RunningCost(const mjModel* model, const mjData* data, const
     double height_cost = 0.0;
     if (torso_site_id_ >= 0) {
         double torso_z = data->site_xpos[3 * torso_site_id_ + 2];
-        double height_err = torso_z - 0.75; // target height
+        double height_err = torso_z - target_height_;
         height_cost = height_err * height_err;
     }
 
@@ -161,9 +167,11 @@ double G1Navigation::RunningCost(const mjModel* model, const mjData* data, const
         ctrl_cost += control[i] * control[i];
     }
 
-    // Weighted combination matching hydrax G1NavigationAugmented
-    return position_cost + orientation_cost + 2.0 * upright_cost
-         + 0.5 * height_cost + 0.01 * ctrl_cost;
+    return pos_weight_ * position_cost + 
+           ori_weight_ * orientation_cost + 
+           upright_weight_ * upright_cost + 
+           height_weight_ * height_cost + 
+           ctrl_weight_ * ctrl_cost;
 }
 
 double G1Navigation::TerminalCost(const mjModel* model, const mjData* data) const {
