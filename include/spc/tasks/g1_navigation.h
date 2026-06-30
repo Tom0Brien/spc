@@ -31,7 +31,7 @@ public:
     int GetObsDim() const { return 103; }
     int GetActionDim() const { return 29; }
 
-private:
+protected:
     // Sensor addresses
     int pelvis_gyro_adr_;     // gyro_pelvis sensor address (3)
     int pelvis_linvel_adr_;   // local_linvel_pelvis sensor address (3)
