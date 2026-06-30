@@ -2,18 +2,18 @@
 
 A high-performance C++ backend for Policy-Guided Sampling-based Predictive Control.
 
-This project implements a highly optimized Cross-Entropy Method (CEM) planner designed for real-time robotic control. By leveraging native MuJoCo C APIs, thread-local simulation states, and OpenMP multi-threading, this library completely bypasses Python's GIL and thread-pool overhead.
+## Requirements
 
-## Features
-
-- **C++ Core Engine:** Parallel physics rollouts utilizing the native MuJoCo C API.
-- **Native Policy Inference:** Fast evaluation of ONNX policies directly inside the C++ planner.
-- **Python Bindings:** Exposed seamlessly to Python (`spc_py`) via `pybind11` for interactive orchestration.
-- **Zero-Boilerplate Tasks:** Dynamically pass parameters (e.g. reward weights, target names) from Python to C++ tasks without recompiling.
+- **Linux x86-64.** The build downloads a prebuilt ONNX Runtime for `linux-x64`, so macOS and Windows are not supported out of the box.
+- **A C++20 compiler** (GCC or Clang).
+- **CMake** ≥ 3.20.
+- **OpenMP** (e.g. `libgomp` / `libomp`) — required for the parallel rollouts.
+- **[`uv`](https://docs.astral.sh/uv/)** for package management. Install with `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+- **Internet access at build time** — CMake fetches pybind11, GoogleTest, and ONNX Runtime.
 
 ## Setup
 
-The project uses `uv` for fast package management and `scikit-build-core` for the C++ backend. You'll need a C++20 compiler and CMake installed.
+The project uses `uv` for fast package management and `scikit-build-core` for the C++ backend.
 
 ```bash
 # Clone the repository
@@ -49,4 +49,8 @@ make install-dev
 make format
 ```
 
-> **Note**: CMake is configured to automatically discover new source files. When you add a new `.cc` file to the `src/` directory, simply run `uv pip install -e .` and it will automatically be compiled into the core library!
+> **Note**: CMake is configured to automatically discover new source files (`GLOB_RECURSE`), so adding a new `.cc` file under `src/` requires no CMake edits. However, a plain `uv pip install -e .` will **not** rebuild after you edit C++ sources — it reports `Audited 1 package` and exits. To force a recompile, run:
+>
+> ```bash
+> make rebuild
+> ```

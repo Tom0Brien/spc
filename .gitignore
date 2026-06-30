@@ -32,11 +32,12 @@
 *.app
 
 # CMake
+# Note: the hand-written root Makefile is tracked; CMake-generated Makefiles
+# live under build/ (ignored below), so we don't ignore "Makefile" globally.
 CMakeCache.txt
 CMakeFiles
 CMakeScripts
 Testing
-Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
