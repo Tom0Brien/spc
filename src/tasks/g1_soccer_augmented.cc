@@ -14,6 +14,10 @@ G1SoccerAugmented::G1SoccerAugmented(mjModel* model, const spc::core::TaskConfig
     // Regularization weight on leg residuals (prevent instability).
     residual_weight_ =
         config.numeric_params.count("residual_weight") ? config.numeric_params.at("residual_weight") : 0.05;
+
+    // Residual kicks need close contact that the behind-ball penalty fights
+    // against, so it is disabled by default for the augmented task.
+    behind_weight_ = config.numeric_params.count("behind_weight") ? config.numeric_params.at("behind_weight") : 0.0;
 }
 
 void G1SoccerAugmented::ApplyControl(const mjModel* model, mjData* data, const float* control) const {

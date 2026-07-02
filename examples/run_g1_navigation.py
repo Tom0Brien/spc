@@ -70,6 +70,10 @@ def main():
     config.sigma_min = 0.05
     config.explore_fraction = 0.5
 
+    # Velocity commands bounded to the RL policy's training range
+    config.u_min = [-1.0, -1.0, -1.0]
+    config.u_max = [1.0, 1.0, 1.0]
+
     cem = spc_py.CEM(env, task, policy, config)
 
     run_interactive(

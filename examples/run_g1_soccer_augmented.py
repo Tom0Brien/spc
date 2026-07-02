@@ -47,6 +47,8 @@ def main():
         "pos_weight": 0.3,
         "ori_weight": 0.2,
         "height_weight": 1.0,
+        "upright_weight": 2.0,  # penalize pelvis tilt (prevents falls)
+        "behind_weight": 0.0,  # off: residual kicks need close contact
         "ctrl_weight": 0.01,
 
         # Augmented (leg residual) params
@@ -67,18 +69,24 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    config.num_samples = 32
+    config.num_samples = 24
     config.num_elites = 4
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 50
-    config.sim_substeps = 10  # dt=0.004, ctrl_dt=0.02 -> 10 substeps
+    config.plan_horizon_steps = 40
+    config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps
     config.control_dim = 15  # vx, vy, vtheta + 12 leg residuals
     config.obs_dim = 103
     config.num_threads = 8
     config.sigma_init = 0.5
     config.sigma_min = 0.05
     config.explore_fraction = 0.5
+
+    # Per-dimension bounds and sampling spread:
+    # velocity commands in [-1, 1], leg residuals in [-0.3, 0.3] rad
+    config.u_min = [-1.0] * 3 + [-0.3] * 12
+    config.u_max = [1.0] * 3 + [0.3] * 12
+    config.sigma_init_per_dim = [0.5] * 3 + [0.15] * 12
 
     cem = spc_py.CEM(env, task, policy, config)
 

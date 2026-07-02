@@ -34,7 +34,7 @@ def main():
     config.num_knots = 4
     config.num_iterations = 1
     config.plan_horizon_steps = 25
-    config.sim_substeps = 5  # dt=0.004, ctrl_dt=0.02 -> 5 substeps
+    config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps
     config.control_dim = 3
     config.obs_dim = 103
     config.num_threads = 8
@@ -72,13 +72,13 @@ def main():
     
     print("Warming up...")
     for _ in range(5):
-        env.step_mpc(cem, 5)
+        env.step_mpc(cem, 10)
         
     print("Profiling...")
     start_time = time.time()
     num_plans = 100
     for _ in range(num_plans):
-        env.step_mpc(cem, 5)
+        env.step_mpc(cem, 10)
     end_time = time.time()
     
     duration = end_time - start_time

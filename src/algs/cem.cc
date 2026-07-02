@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numeric>
 
 #include "spc/utils/spline.h"
@@ -14,9 +15,26 @@ namespace algs {
 CEM::CEM(mjModel* model, std::shared_ptr<core::Task> task, std::shared_ptr<core::Policy> policy,
          const CEMConfig& config)
     : Optimizer(model, task, policy, config), cem_config_(config) {
-    int n_params = config.control_dim * config.num_knots;
+    int nu = config.control_dim;
+    int n_params = nu * config.num_knots;
+
+    // Expand per-dimension sigma and bounds, falling back to scalar sigma / unbounded.
+    sigma_init_dim_.resize(nu);
+    u_min_dim_.resize(nu);
+    u_max_dim_.resize(nu);
+    for (int j = 0; j < nu; ++j) {
+        sigma_init_dim_[j] = (j < static_cast<int>(config.sigma_init_per_dim.size())) ? config.sigma_init_per_dim[j]
+                                                                                      : config.sigma_init;
+        u_min_dim_[j] = (j < static_cast<int>(config.u_min.size())) ? config.u_min[j]
+                                                                    : -std::numeric_limits<float>::infinity();
+        u_max_dim_[j] =
+            (j < static_cast<int>(config.u_max.size())) ? config.u_max[j] : std::numeric_limits<float>::infinity();
+    }
+
     mean_.resize(n_params, 0.0f);
-    stddev_.resize(n_params, config.sigma_init);
+    stddev_.resize(n_params);
+    for (int k = 0; k < n_params; ++k)
+        stddev_[k] = sigma_init_dim_[k % nu];
 
     int max_threads = omp_get_max_threads();
     rngs_.resize(max_threads);
@@ -26,7 +44,8 @@ CEM::CEM(mjModel* model, std::shared_ptr<core::Task> task, std::shared_ptr<core:
 }
 
 void CEM::SampleKnots(std::vector<float>& samples) {
-    int n_params = cem_config_.control_dim * cem_config_.num_knots;
+    int nu = cem_config_.control_dim;
+    int n_params = nu * cem_config_.num_knots;
     int num_explore = static_cast<int>(cem_config_.num_samples * cem_config_.explore_fraction);
     int num_main = cem_config_.num_samples - num_explore;
 
@@ -38,8 +57,18 @@ void CEM::SampleKnots(std::vector<float>& samples) {
         bool is_explore = (i >= num_main);
 
         for (int k = 0; k < n_params; ++k) {
-            float stddev = is_explore ? cem_config_.sigma_init : stddev_[k];
-            samples[i * n_params + k] = mean_[k] + stddev * dist(rngs_[tid]);
+            int dim = k % nu;
+            float stddev = is_explore ? sigma_init_dim_[dim] : stddev_[k];
+            float value = mean_[k] + stddev * dist(rngs_[tid]);
+
+            // Clamp to control bounds so elites (and hence the updated
+            // distribution) stay inside the feasible box.
+            if (value < u_min_dim_[dim])
+                value = u_min_dim_[dim];
+            if (value > u_max_dim_[dim])
+                value = u_max_dim_[dim];
+
+            samples[i * n_params + k] = value;
         }
     }
 }
