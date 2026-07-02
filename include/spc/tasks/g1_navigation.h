@@ -47,6 +47,9 @@ protected:
     float action_scale_;
     float gait_freq_;
 
+    // Velocity command limits (vx, vy, vtheta) applied to the high-level commands.
+    float vel_limit_[3];
+
     double target_height_;
     double pos_weight_;
     double ori_weight_;

@@ -42,6 +42,15 @@ G1Navigation::G1Navigation(mjModel* model, const spc::core::TaskConfig& config) 
                         : 0.5f;
     gait_freq_ =
         config.numeric_params.count("gait_freq") ? static_cast<float>(config.numeric_params.at("gait_freq")) : 1.5f;
+
+    // Velocity command limits (symmetric): defaults match the RL policy training bounds.
+    vel_limit_[0] =
+        config.numeric_params.count("vx_limit") ? static_cast<float>(config.numeric_params.at("vx_limit")) : 1.0f;
+    vel_limit_[1] =
+        config.numeric_params.count("vy_limit") ? static_cast<float>(config.numeric_params.at("vy_limit")) : 1.0f;
+    vel_limit_[2] = config.numeric_params.count("vtheta_limit")
+                        ? static_cast<float>(config.numeric_params.at("vtheta_limit"))
+                        : 1.0f;
     target_height_ = config.numeric_params.count("target_height") ? config.numeric_params.at("target_height") : 0.75;
 
     pos_weight_ = config.numeric_params.count("pos_weight") ? config.numeric_params.at("pos_weight") : 1.0;
@@ -193,10 +202,15 @@ void G1Navigation::ApplyControl(const mjModel* model, mjData* data, const float*
     // Build the 103-dim observation with the velocity command inserted
     float obs[128];  // 103 needed, use 128 for alignment
     GetObservation(model, data, obs);
-    // Overwrite the command slots (indices 9, 10, 11)
-    obs[9] = action[0];
-    obs[10] = action[1];
-    obs[11] = action[2];
+    // Overwrite the command slots (indices 9, 10, 11), clamping to velocity limits.
+    for (int i = 0; i < 3; ++i) {
+        float cmd = action[i];
+        if (cmd < -vel_limit_[i])
+            cmd = -vel_limit_[i];
+        if (cmd > vel_limit_[i])
+            cmd = vel_limit_[i];
+        obs[9 + i] = cmd;
+    }
 
     // Run ONNX policy to get 29 motor actions
     float policy_action[32];  // 29 needed
