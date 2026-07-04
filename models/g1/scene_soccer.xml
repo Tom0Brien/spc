@@ -1,9 +1,7 @@
 <mujoco model="g1 scene soccer">
   <include file="g1.xml"/>
   
-  <option iterations="3" ls_iterations="5" timestep=".002" integrator="Euler">
-    <flag eulerdamp="disable"/>
-  </option>
+  <option iterations="3" ls_iterations="5" timestep=".004" integrator="implicitfast"/>
 
   <statistic center="0 0 0.7" extent="1.2" meansize="0.04"/>
 

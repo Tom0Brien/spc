@@ -17,6 +17,29 @@ struct CEMConfig : public OptimizerConfig {
     float sigma_min = 0.05f;
     float explore_fraction = 0.0f;
 
+    // Receding-horizon warm start: control steps to shift the mean spline
+    // forward at the start of each Optimize() call (i.e. how many control
+    // steps of the previous plan get executed between replans). 0 disables.
+    int replan_shift_steps = 0;
+
+    // Distribution update rule:
+    //   0 = CEM with rank-weighted elites (default)
+    //   1 = MPPI: softmax-weighted average over ALL samples with temperature
+    //       mppi_lambda; sigma stays fixed at sigma_init (no adaptation).
+    int update_rule = 0;
+    float mppi_lambda = 1.0f;
+
+    // iCEM-style elite reuse: re-inject the top elite_keep samples from the
+    // previous replan into the new population (after samples[0] = mean).
+    int elite_keep = 0;
+
+    // AR(1) correlation of exploration noise across knots (iCEM colored
+    // noise). 0 = white noise (default); 0.5-0.9 = temporally smooth samples.
+    float noise_rho = 0.0f;
+
+    // RNG seed for sampling.
+    unsigned int seed = 1337;
+
     // Optional per-dimension overrides (size = control_dim). When empty, the
     // scalar sigma_init is used and samples are unbounded. Bounds are applied
     // at sampling time so the elite distribution stays inside the feasible box.
@@ -36,6 +59,7 @@ public:
     ~CEM() override = default;
 
 protected:
+    void PrepareForReplan() override;
     void SampleKnots(std::vector<float>& samples) override;
     void UpdateDistribution(const std::vector<float>& samples, const std::vector<double>& costs) override;
     void GetBestAction(const mjData* current_state, float* best_action_out) override;
@@ -45,6 +69,8 @@ private:
 
     std::vector<float> mean_;
     std::vector<float> stddev_;
+    std::vector<float> kept_elites_;  // top elite_keep knot vectors from the previous replan
+    int num_kept_ = 0;
     std::vector<std::mt19937> rngs_;
 
     // Expanded per-dimension arrays (size = control_dim)

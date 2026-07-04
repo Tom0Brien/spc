@@ -4,7 +4,7 @@ Uses the G1Navigation task with CEM optimization to navigate a G1 humanoid
 robot to a goal position defined by a mocap body marker.
 
 The velocity commands (vx, vy, vtheta) are optimized by CEM, and a trained
-ONNX locomotion policy converts them to motor targets at each step.
+locomotion policy (hand-rolled MLP) converts them to motor targets at each step.
 
 Usage: python3 examples/run_g1_navigation.py [--no_policy]
 """
@@ -28,7 +28,7 @@ def main():
     args = parser.parse_args()
 
     model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/g1/scene_navigation.xml"))
-    policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../policies/g1_navigation.onnx"))
+    policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../policies/g1_navigation.mlp"))
 
     print(f"Loading model from {model_path}")
     env = spc_py.SpcEnv(model_path)
@@ -50,18 +50,17 @@ def main():
     if not args.no_policy:
         if os.path.exists(policy_path):
             print(f"Loading policy from {policy_path}")
-            policy = spc_py.ONNXPolicy(policy_path)
+            policy = spc_py.MLPPolicy(policy_path)
         else:
             print(f"WARNING: Policy not found at {policy_path}")
-            print("Run 'python3 scripts/export_g1_onnx.py' first to export the policy.")
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    config.num_samples = 16
+    config.num_samples = 8  # 1 rollout per core; realtime on 8 physical cores
     config.num_elites = 4
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 50
+    config.plan_horizon_steps = 40
     config.sim_substeps = 5  # dt=0.004, ctrl_dt=0.02 -> 5 substeps
     config.control_dim = 3  # vx, vy, vtheta
     config.obs_dim = 103
@@ -69,6 +68,8 @@ def main():
     config.sigma_init = 0.5
     config.sigma_min = 0.05
     config.explore_fraction = 0.5
+    config.replan_shift_steps = 1  # replan every ctrl step: warm-start shifted mean
+    config.elite_keep = 2  # re-inject previous replan's best samples (iCEM)
 
     # Velocity commands bounded to the RL policy's training range
     config.u_min = [-1.0, -1.0, -1.0]

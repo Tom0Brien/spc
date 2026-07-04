@@ -69,18 +69,23 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    config.num_samples = 24
+    config.num_samples = 8  # 1 rollout per core; realtime on 8 physical cores
     config.num_elites = 4
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 40
-    config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps
+    config.plan_horizon_steps = 36
+    config.sim_substeps = 5  # dt=0.004, ctrl_dt=0.02 -> 5 substeps
     config.control_dim = 15  # vx, vy, vtheta + 12 leg residuals
     config.obs_dim = 103
     config.num_threads = 8
     config.sigma_init = 0.5
     config.sigma_min = 0.05
     config.explore_fraction = 0.5
+    # Warm-start shift and elite reuse stay off: leg residuals are
+    # gait-phase-locked, so re-timed means and stale elites from the previous
+    # replan desynchronize from the gait (verified to hurt the task).
+    config.replan_shift_steps = 0
+    config.elite_keep = 0
 
     # Per-dimension bounds and sampling spread:
     # velocity commands in [-1, 1], leg residuals in [-0.3, 0.3] rad
@@ -119,7 +124,7 @@ def main():
         cem,
         model_path,
         sim_dt=0.02,
-        sim_steps_per_replan=10,
+        sim_steps_per_replan=5,
         init_kwargs={"custom_init_fn": custom_init},
     )
 

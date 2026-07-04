@@ -63,18 +63,20 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    config.num_samples = 32
+    config.num_samples = 8  # 1 rollout per core; realtime on 8 physical cores
     config.num_elites = 4
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 50
-    config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps
+    config.plan_horizon_steps = 40
+    config.sim_substeps = 5  # dt=0.004, ctrl_dt=0.02 -> 5 substeps
     config.control_dim = 3  # vx, vy, vtheta
     config.obs_dim = 103
     config.num_threads = 8
     config.sigma_init = 0.5
     config.sigma_min = 0.05
     config.explore_fraction = 0.5
+    config.replan_shift_steps = 1  # replan every ctrl step: warm-start shifted mean
+    config.elite_keep = 2  # re-inject previous replan's best samples (iCEM)
 
     # Velocity commands bounded to the RL policy's training range
     config.u_min = [-1.0, -1.0, -1.0]
@@ -111,7 +113,7 @@ def main():
         cem,
         model_path,
         sim_dt=0.02,
-        sim_steps_per_replan=10,
+        sim_steps_per_replan=5,
         init_kwargs={"custom_init_fn": custom_init},
     )
 

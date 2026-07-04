@@ -54,6 +54,10 @@ public:
     virtual void Optimize(const mjData* current_state, float* best_action_out);
 
 protected:
+    // Called once at the start of each Optimize() call, before sampling.
+    // Lets subclasses warm-start the search distribution for a receding horizon.
+    virtual void PrepareForReplan() {}
+
     virtual void SampleKnots(std::vector<float>& samples) = 0;
     virtual void UpdateDistribution(const std::vector<float>& samples, const std::vector<double>& costs) = 0;
     virtual void GetBestAction(const mjData* current_state, float* best_action_out) = 0;

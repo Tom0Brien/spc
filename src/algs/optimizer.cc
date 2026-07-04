@@ -41,6 +41,8 @@ void Optimizer::Optimize(const mjData* current_state, float* best_action_out) {
     std::vector<float> samples(num_samples * n_params);
     std::vector<double> costs(num_samples);
 
+    PrepareForReplan();
+
     for (int iter = 0; iter < config_.num_iterations; ++iter) {
         SampleKnots(samples);
         EvaluateRollouts(current_state, samples, costs);
