@@ -1,0 +1,105 @@
+<mujoco model="t1 scene soccer">
+  <!-- Inherits t1.xml's simulation options (dt=.002, Euler, iterations=3/ls=5),
+       matching the mujoco_playground T1 joystick training/deploy settings. -->
+  <include file="t1.xml"/>
+
+  <statistic center="0 0 0.5" extent="1.2" meansize="0.04"/>
+
+  <visual>
+    <headlight diffuse=".8 .8 .8" ambient=".2 .2 .2" specular="1 1 1"/>
+    <rgba force="1 0 0 1"/>
+    <global azimuth="140" elevation="-20"/>
+    <map force="0.01"/>
+    <scale forcewidth="0.3" contactwidth="0.5" contactheight="0.2"/>
+    <quality shadowsize="8192"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="1 1 1" rgb2="1 1 1" width="800" height="800"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="1 1 1" rgb2="1 1 1"
+      markrgb="0 0 0" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0"/>
+
+    <texture name="soccer_ball" type="cube"
+      fileup="assets/soccer_ball_up.png"
+      filedown="assets/soccer_ball_down.png"
+      filefront="assets/soccer_ball_front.png"
+      fileback="assets/soccer_ball_back.png"
+      fileleft="assets/soccer_ball_left.png"
+      fileright="assets/soccer_ball_right.png"/>
+    <material name="soccer_ball" texture="soccer_ball"/>
+  </asset>
+
+  <worldbody>
+    <geom name="floor" size="0 0 0.01" type="plane" material="groundplane" friction="1.2 0.1 0.5" priority="1" contype="1" conaffinity="0" condim="6"/>
+
+    <body name="goal_marker" mocap="true" pos="2 0 0.05">
+      <geom name="goal_cylinder" type="cylinder" size="0.25 0.05"
+            rgba="0 1 0 0.3" contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Soccer goal posts (red team) -->
+    <body name="goal_red" pos="-4.5 0 0">
+      <geom name="goal_box_red" type="box" size="0.3 1.2 0.9"
+            pos="-0.3 0 0.9" rgba="1 0 0 0.2" contype="0" conaffinity="0"/>
+      <geom name="goal_post_red_left" type="cylinder" size="0.06 0.9"
+            pos="0 1.2 0.9" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+      <geom name="goal_post_red_right" type="cylinder" size="0.06 0.9"
+            pos="0 -1.2 0.9" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+      <geom name="goal_crossbar_red" type="capsule" size="0.06 1.2"
+            pos="0 0 1.8" quat="0.707 0.707 0 0" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+    </body>
+
+    <!-- Soccer goal posts (green team / opponent) -->
+    <body name="goal_green" pos="4.5 0 0">
+      <geom name="goal_box_green" type="box" size="0.3 1.2 0.9"
+            pos="0.3 0 0.9" rgba="0 1 0 0.2" contype="0" conaffinity="0"/>
+      <geom name="goal_post_green_left" type="cylinder" size="0.06 0.9"
+            pos="0 1.2 0.9" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+      <geom name="goal_post_green_right" type="cylinder" size="0.06 0.9"
+            pos="0 -1.2 0.9" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+      <geom name="goal_crossbar_green" type="capsule" size="0.06 1.2"
+            pos="0 0 1.8" quat="0.707 0.707 0 0" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+    </body>
+
+    <!-- Soccer ball -->
+    <body name="soccer_ball" pos="2 0 0.117">
+      <freejoint name="ball_root"/>
+      <geom name="ball" type="sphere" size="0.117"
+            condim="6" priority="1"
+            solref="0.01 0.8" material="soccer_ball"/>
+      <inertial pos="0 0 0" mass="0.45" diaginertia="0.011 0.011 0.011"/>
+    </body>
+  </worldbody>
+
+  <contact>
+    <!-- Essential Ball contacts -->
+    <pair name="ball_left_foot" geom1="ball" geom2="left_foot" condim="3" friction="1.2 0.1 0.5"/>
+    <pair name="ball_right_foot" geom1="ball" geom2="right_foot" condim="3" friction="1.2 0.1 0.5"/>
+    <pair name="ball_floor" geom1="ball" geom2="floor" condim="6" friction="1 1 0.005 0.02 0.02"/>
+  </contact>
+
+  <keyframe>
+    <key name="home"
+      qpos="
+    0 0 0.665
+    1 0 0 0
+    0 0
+    0 -1.4 0 -0.4
+    0 1.4 0 0.4
+    0
+    -0.2 0 0 0.4 -0.2 0
+    -0.2 0 0 0.4 -0.2 0
+    2 0 0.117
+    1 0 0 0
+    "
+      ctrl="
+    0 0
+    0 -1.4 0 -0.4
+    0 1.4 0 0.4
+    0
+    -0.2 0 0 0.4 -0.2 0
+    -0.2 0 0 0.4 -0.2 0
+    "/>
+  </keyframe>
+</mujoco>
