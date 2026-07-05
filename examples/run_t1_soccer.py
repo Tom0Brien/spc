@@ -62,12 +62,19 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    config.num_samples = 8  # 1 rollout per core; realtime on 8 physical cores
-    config.num_elites = 4
+    # Physics stepping is ~100% of the rollout cost, so we plan on a coarser
+    # model (dt=0.004, 5 substeps == 0.02s/control step, matching the real
+    # dt=0.002 x10), making each rollout ~1.7x cheaper. That saving buys a much
+    # longer horizon (64 control steps ~ 1.3s), which the dribble planning uses
+    # to drive the ball all the way to the goal. Runs ~0.5x realtime on 8
+    # physical cores; a faster many-core CPU recovers realtime.
+    config.num_samples = 16
+    config.num_elites = 8
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 25
-    config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps (mujoco_playground settings)
+    config.plan_horizon_steps = 64
+    config.sim_substeps = 5  # coarse plan: 5 x plan_timestep(0.004) = 0.02s per control step
+    config.plan_timestep = 0.004  # coarse planning dt (real sim stays at the model's 0.002)
     config.control_dim = 3  # vx, vy, vtheta
     config.obs_dim = 85
     config.num_threads = 8

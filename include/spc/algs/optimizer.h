@@ -31,6 +31,17 @@ struct OptimizerConfig {
     // valid across replans without any warm-start re-timing.
     int phase_dims = 0;
     float phase_freq = 0.0f;
+
+    // Coarse planning model: physics stepping dominates rollout cost, so the
+    // rollouts can use a cheaper model than the real one. When plan_timestep>0,
+    // rollouts run on a clone of the model with this larger timestep (and,
+    // optionally, cheaper solver iterations). Pair it with a proportionally
+    // smaller sim_substeps so one control step still advances the same sim time
+    // (e.g. real dt=0.002 x10 substeps == plan dt=0.004 x5 substeps = 0.02s),
+    // which roughly halves rollout cost. 0 = use the real model's setting.
+    double plan_timestep = 0.0;
+    int plan_iterations = 0;
+    int plan_ls_iterations = 0;
 };
 
 /**
@@ -76,7 +87,8 @@ protected:
     // interpolation of knots at the gait phase corresponding to sim time.
     void InterpPhaseDims(const float* knots, double time, float* control) const;
 
-    mjModel* model_;
+    mjModel* model_;  // model used for rollouts (coarse plan clone if configured)
+    mjModel* plan_model_ = nullptr;  // owned coarse planning clone, else null
     std::shared_ptr<core::Task> task_;
     std::shared_ptr<core::Policy> policy_;
     OptimizerConfig config_;

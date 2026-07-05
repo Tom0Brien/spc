@@ -79,17 +79,21 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    # The 15-dim augmented control (3 velocity + 12 leg residuals) needs more
-    # samples than the 3-dim tasks: at 8 samples the leg residuals are badly
-    # under-optimized. 16 samples (2 rollouts/core here) roughly halves the
-    # ball-to-goal distance. Runs ~0.47x realtime on 8 physical cores; a faster
-    # many-core CPU recovers realtime.
-    config.num_samples = 16
-    config.num_elites = 8
+    # The 15-dim augmented control (3 velocity + 12 leg residuals) is sample-
+    # hungry: at 8 samples the leg residuals are badly under-optimized. Physics
+    # stepping is ~100% of the rollout cost, so we plan on a coarser model
+    # (dt=0.004, 5 substeps == 0.02s/control step, matching the real dt=0.002
+    # x10) which makes each rollout ~1.7x cheaper. That saving is reinvested in
+    # more samples (24) and a longer horizon (48), which the kick benefits from.
+    # Net: better plans at the same ~0.45x realtime as the fine 16x40 config.
+    # A faster many-core CPU recovers realtime.
+    config.num_samples = 24
+    config.num_elites = 12
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 40  # longer lookahead so CEM can discover the leg-swing kick
-    config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps (mujoco_playground settings)
+    config.plan_horizon_steps = 48  # longer lookahead so CEM can discover the leg-swing kick
+    config.sim_substeps = 5  # coarse plan: 5 x plan_timestep(0.004) = 0.02s per control step
+    config.plan_timestep = 0.004  # coarse planning dt (real sim stays at the model's 0.002)
     config.control_dim = 15  # vx, vy, vtheta + 12 leg residuals
     config.obs_dim = 85
     config.num_threads = 8

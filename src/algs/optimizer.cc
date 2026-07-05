@@ -18,13 +18,27 @@ Optimizer::Optimizer(mjModel* model, std::shared_ptr<core::Task> task, std::shar
         throw std::invalid_argument("MuJoCo model cannot be null");
     }
 
+    // Build a cheaper clone for rollouts if a coarse planning model is
+    // configured. It shares the real model's dimensions (only opt.* differs),
+    // so mjData stays layout-compatible with the real state passed to Optimize.
+    if (config.plan_timestep > 0.0 || config.plan_iterations > 0 || config.plan_ls_iterations > 0) {
+        plan_model_ = mj_copyModel(nullptr, model);
+        if (config.plan_timestep > 0.0)
+            plan_model_->opt.timestep = config.plan_timestep;
+        if (config.plan_iterations > 0)
+            plan_model_->opt.iterations = config.plan_iterations;
+        if (config.plan_ls_iterations > 0)
+            plan_model_->opt.ls_iterations = config.plan_ls_iterations;
+        model_ = plan_model_;  // rollouts step the coarse model
+    }
+
     if (task_ && policy_) {
         task_->SetPolicy(policy_);
     }
 
     thread_datas_.resize(config.num_samples, nullptr);
     for (int i = 0; i < config.num_samples; ++i) {
-        thread_datas_[i] = mj_makeData(model);
+        thread_datas_[i] = mj_makeData(model_);
     }
 }
 
@@ -33,6 +47,8 @@ Optimizer::~Optimizer() {
         if (d)
             mj_deleteData(d);
     }
+    if (plan_model_)
+        mj_deleteModel(plan_model_);
 }
 
 void Optimizer::Optimize(const mjData* current_state, float* best_action_out) {

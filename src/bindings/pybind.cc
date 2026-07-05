@@ -200,7 +200,10 @@ PYBIND11_MODULE(spc_py, m) {
         .def_readwrite("sigma_init_per_dim", &spc::algs::CEMConfig::sigma_init_per_dim)
         .def_readwrite("u_min", &spc::algs::CEMConfig::u_min)
         .def_readwrite("u_max", &spc::algs::CEMConfig::u_max)
-        .def_readwrite("num_threads", &spc::algs::CEMConfig::num_threads);
+        .def_readwrite("num_threads", &spc::algs::CEMConfig::num_threads)
+        .def_readwrite("plan_timestep", &spc::algs::CEMConfig::plan_timestep)
+        .def_readwrite("plan_iterations", &spc::algs::CEMConfig::plan_iterations)
+        .def_readwrite("plan_ls_iterations", &spc::algs::CEMConfig::plan_ls_iterations);
 
     py::class_<spc::algs::Optimizer, std::shared_ptr<spc::algs::Optimizer>>(m, "Optimizer");
 
