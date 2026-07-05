@@ -77,7 +77,11 @@ void Optimizer::EvaluateRollouts(const mjData* current_state, const std::vector<
     int n_params = nu * num_knots;
     int num_samples = config_.num_samples;
 
-#pragma omp parallel for num_threads(config_.num_threads)
+// Rollout costs are heterogeneous (contact bursts, early divergence), so a
+// static schedule leaves threads idle behind the slowest chunk; dynamic
+// scheduling balances the makespan (same reason mujoco's rollout.cc chunks
+// work through a thread pool).
+#pragma omp parallel for schedule(dynamic, 1) num_threads(config_.num_threads)
     for (int i = 0; i < num_samples; ++i) {
         mjData* d = thread_datas_[i];
         mj_copyData(d, model_, current_state);

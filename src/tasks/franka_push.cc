@@ -140,7 +140,6 @@ double FrankaPush::TerminalCost(const mjModel* model, const mjData* data) const 
 
 void FrankaPush::ApplyControl(const mjModel* model, mjData* data, const float* residual) const {
     float max_torque[7] = {87.0f, 87.0f, 87.0f, 87.0f, 12.0f, 12.0f, 12.0f};
-    float gear[7] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};  // Assuming gear=1, check limits
 
     float base_action[128];
     for (int j = 0; j < 7; ++j)
@@ -155,13 +154,27 @@ void FrankaPush::ApplyControl(const mjModel* model, mjData* data, const float* r
     for (int i = 0; i < 7; ++i) {
         float ctrl = (base_action[i] + residual[i]) * action_scale_;
 
-        // Clamp torque
+        // Clamp torque (matches the hydrax reference; no-op for this model
+        // since ctrlrange is tighter)
         if (ctrl > max_torque[i])
             ctrl = max_torque[i];
         if (ctrl < -max_torque[i])
             ctrl = -max_torque[i];
 
-        // The MuJoCo model bounds might be different but we clamp here manually
+        // Clamp to the actuator ctrlrange (reference clips to lowers/uppers =
+        // [-1, 1]). Without this, data->ctrl can store values far outside the
+        // range; physics clamps the applied force anyway, but the observation
+        // reads last_action = ctrl/action_scale, which then goes far outside
+        // the policy's training distribution and corrupts its base action.
+        if (model->actuator_ctrllimited[i]) {
+            float lo = static_cast<float>(model->actuator_ctrlrange[2 * i]);
+            float hi = static_cast<float>(model->actuator_ctrlrange[2 * i + 1]);
+            if (ctrl < lo)
+                ctrl = lo;
+            if (ctrl > hi)
+                ctrl = hi;
+        }
+
         data->ctrl[i] = ctrl;
     }
 

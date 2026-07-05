@@ -116,12 +116,15 @@ def init_hydrax_state(m_py, d_py, env):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Franka Push with ONNX Policy in C++")
-    parser.add_argument("--no_policy", action="store_true", default=False, help="Disable ONNX policy")
+    parser = argparse.ArgumentParser(description="Run Franka Push with RL policy + CEM residuals in C++")
+    parser.add_argument("--no_policy", action="store_true", default=False, help="Disable the RL policy base action")
     args = parser.parse_args()
 
     model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/franka_push/scene.xml"))
-    policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../policies/franka_push.onnx"))
+    # Hand-rolled MLP inference (converted from franka_push.onnx): identical
+    # outputs, but skips ONNX Runtime session overhead, which dominates for
+    # this small (17k param) policy and is what makes policy+CEM realtime.
+    policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../policies/franka_push.mlp"))
 
     print(f"Loading model from {model_path}")
     env = spc_py.SpcEnv(model_path)
@@ -139,12 +142,13 @@ def main():
     policy = None
     if not args.no_policy:
         print(f"Loading policy from {policy_path}")
-        policy = spc_py.ONNXPolicy(policy_path)
+        policy = spc_py.MLPPolicy(policy_path)
 
     config = spc_py.CEMConfig()
-    config.num_samples = 96
+    
+    config.num_samples = 48
     config.num_elites = 8
-    config.num_knots = 6
+    config.num_knots = 4
     config.num_iterations = 1
     config.plan_horizon_steps = 25
     config.sim_substeps = 2
@@ -161,11 +165,6 @@ def main():
     m_py = mujoco.MjModel.from_xml_path(model_path)
     d_py = mujoco.MjData(m_py)
     init_hydrax_state(m_py, d_py, env)
-
-    # Run generic interactive, bypassing init_env_state by providing no keyframe (it will just reset to 0 which we immediately overwrite)
-    # Actually wait, if we run_interactive it will call init_env_state which might overwrite our init_hydrax_state.
-    # To fix this, let's update utils.py to accept a custom init_fn!
-    # I'll modify utils.py shortly.
     run_interactive(
         env, cem, model_path, sim_dt=0.02, sim_steps_per_replan=2, init_kwargs={"custom_init_fn": init_hydrax_state}
     )
