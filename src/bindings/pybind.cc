@@ -2,12 +2,11 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <iostream>
-#include <cstdarg>
-#include <cstdio>
 
 #include "spc/algs/cem.h"
 #include "spc/algs/optimizer.h"
+#include "spc/core/mlp_policy.h"
+#include "spc/core/onnx_policy.h"
 #include "spc/core/policy.h"
 #include "spc/core/task.h"
 #include "spc/core/task_factory.h"
@@ -113,9 +112,6 @@ private:
     mjData* d_;
     bool owns_data_;
 };
-
-#include "spc/core/mlp_policy.h"
-#include "spc/core/onnx_policy.h"
 
 std::shared_ptr<spc::algs::Optimizer> MakeCEM(SpcEnv& env, std::shared_ptr<spc::core::Task> task,
                                               std::shared_ptr<spc::core::Policy> policy,

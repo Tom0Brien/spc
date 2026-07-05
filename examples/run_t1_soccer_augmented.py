@@ -57,11 +57,8 @@ def main():
         "leg_joint_start": 11,
         "leg_joint_count": 12,
         "residual_weight": 0.5,
-        # Distance-to-ball gate for the residuals: they fade to zero beyond
-        # gate_far and reach full strength within gate_near. This keeps the
-        # far-field approach a clean velocity-only problem (so CEM's samples all
-        # inform the velocity command instead of being diluted across 12 useless
-        # residual dims) and only engages the leg-swing kick next to the ball.
+        # Residuals fade to zero beyond gate_far and reach full strength within
+        # gate_near, keeping the far-field approach velocity-only.
         "gate_near": 0.45,
         "gate_far": 0.75,
     }
@@ -79,20 +76,16 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    # The 15-dim augmented control (3 velocity + 12 leg residuals) is sample-
-    # hungry: at 8 samples the leg residuals are badly under-optimized. Physics
-    # stepping is ~100% of the rollout cost, so we plan on a coarser model
-    # (dt=0.004, 5 substeps == 0.02s/control step, matching the real dt=0.002
-    # x10) which makes each rollout ~1.7x cheaper. That saving is reinvested in
-    # more samples (24) and a longer horizon (48), which the kick benefits from.
-    # Net: better plans at the same ~0.45x realtime as the fine 16x40 config.
-    # A faster many-core CPU recovers realtime.
+    # Rollouts plan on a coarser model (dt=0.004 x5 substeps = 0.02s/control
+    # step, ~1.7x cheaper than the real dt=0.002 x10); the saving buys the
+    # sample count and horizon the 15-dim control needs. ~0.45x realtime on 8
+    # cores.
     config.num_samples = 24
     config.num_elites = 12
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 48  # longer lookahead so CEM can discover the leg-swing kick
-    config.sim_substeps = 5  # coarse plan: 5 x plan_timestep(0.004) = 0.02s per control step
+    config.plan_horizon_steps = 48
+    config.sim_substeps = 5
     config.plan_timestep = 0.004  # coarse planning dt (real sim stays at the model's 0.002)
     config.control_dim = 15  # vx, vy, vtheta + 12 leg residuals
     config.obs_dim = 85

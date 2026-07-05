@@ -89,10 +89,6 @@ void Optimizer::EvaluateRollouts(const mjData* current_state, const std::vector<
         double total_cost = 0.0;
         const float* sample_knots = &samples[i * n_params];
         float current_control[128];
-        float obs[512];
-        float base_action[128];
-        for (int j = 0; j < nu; ++j)
-            base_action[j] = 0.0f;
 
         for (int step = 0; step < horizon_steps; ++step) {
             // Interpolate residual control from knots

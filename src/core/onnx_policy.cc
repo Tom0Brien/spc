@@ -1,6 +1,5 @@
 #include "spc/core/onnx_policy.h"
 
-#include <iostream>
 #include <stdexcept>
 
 namespace spc {

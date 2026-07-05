@@ -33,7 +33,6 @@ def main():
     print(f"Loading model from {model_path}")
     env = spc_py.SpcEnv(model_path)
 
-    # You can now configure the C++ task dynamically from Python!
     task_params = {
         "action_scale": 0.5,
         "gait_freq": 1.5,

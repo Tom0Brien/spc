@@ -1,13 +1,21 @@
 #pragma once
 
-#include "spc/tasks/t1_navigation.h"
+#include "spc/tasks/humanoid_navigation.h"
 
 namespace spc {
 namespace tasks {
 
-class T1Soccer : public T1Navigation {
+/**
+ * @brief Humanoid soccer task: navigate to a ball and push it toward a mocap goal.
+ *
+ * Inherits the navigation control pipeline (velocity commands -> RL policy ->
+ * motor targets) and replaces the cost: ball-to-goal distance, a standoff
+ * position behind the ball, an approach/kick orientation blend, and the
+ * navigation stability terms.
+ */
+class HumanoidSoccer : public HumanoidNavigation {
 public:
-    T1Soccer(mjModel* model, const spc::core::TaskConfig& config);
+    HumanoidSoccer(mjModel* model, const core::TaskConfig& config, HumanoidSpec spec);
 
     double RunningCost(const mjModel* model, const mjData* data, const float* control) const override;
     double TerminalCost(const mjModel* model, const mjData* data) const override;
@@ -16,7 +24,6 @@ protected:
     int soccer_ball_id_;
     int ball_dofadr_;  // qvel address of the ball freejoint
 
-    // config params for soccer behavior
     double standoff_distance_;
     double ball_goal_weight_;
     double ball_vel_weight_;  // reward ball velocity toward goal

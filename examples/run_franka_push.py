@@ -2,7 +2,6 @@ import argparse
 import os
 
 import mujoco
-import mujoco.viewer
 import numpy as np
 import spc_py
 
@@ -121,15 +120,13 @@ def main():
     args = parser.parse_args()
 
     model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/franka_push/scene.xml"))
-    # Hand-rolled MLP inference (converted from franka_push.onnx): identical
-    # outputs, but skips ONNX Runtime session overhead, which dominates for
-    # this small (17k param) policy and is what makes policy+CEM realtime.
+    # .mlp = hand-rolled inference of franka_push.onnx; skipping ONNX Runtime
+    # session overhead is what makes policy+CEM realtime.
     policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../policies/franka_push.mlp"))
 
     print(f"Loading model from {model_path}")
     env = spc_py.SpcEnv(model_path)
 
-    # You can now configure the C++ task dynamically from Python!
     task_params = {
         "obj_target_weight": 10.0,
         "gripper_obj_weight": 5.0,
@@ -161,10 +158,6 @@ def main():
 
     cem = spc_py.CEM(env, task, policy, config)
 
-    # Initialize using the custom Franka state function before running
-    m_py = mujoco.MjModel.from_xml_path(model_path)
-    d_py = mujoco.MjData(m_py)
-    init_hydrax_state(m_py, d_py, env)
     run_interactive(
         env, cem, model_path, sim_dt=0.02, sim_steps_per_replan=2, init_kwargs={"custom_init_fn": init_hydrax_state}
     )

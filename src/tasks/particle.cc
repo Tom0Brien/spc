@@ -23,8 +23,7 @@ Particle::Particle(mjModel* model, const spc::core::TaskConfig& config) {
 }
 
 void Particle::GetObservation(const mjModel* model, const mjData* data, float* obs_out) const {
-    // Currently, particle task doesn't use observations for control in these examples
-    // Left empty for purely analytical testing
+    // No observation: the particle task runs without a policy.
 }
 
 double Particle::TerminalCost(const mjModel* model, const mjData* data) const {

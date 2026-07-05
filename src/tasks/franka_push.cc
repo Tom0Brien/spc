@@ -1,8 +1,6 @@
 #include "spc/tasks/franka_push.h"
 
 #include <cmath>
-#include <iostream>
-#include <vector>
 
 namespace spc {
 namespace tasks {
@@ -134,8 +132,8 @@ double FrankaPush::RunningCost(const mjModel* model, const mjData* data, const f
 }
 
 double FrankaPush::TerminalCost(const mjModel* model, const mjData* data) const {
-    std::vector<float> zero_ctrl(7, 0.0f);
-    return RunningCost(model, data, zero_ctrl.data());
+    float zero_ctrl[7] = {0.0f};
+    return RunningCost(model, data, zero_ctrl);
 }
 
 void FrankaPush::ApplyControl(const mjModel* model, mjData* data, const float* residual) const {
