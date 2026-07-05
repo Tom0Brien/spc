@@ -1,3 +1,4 @@
+import argparse
 import os
 
 import spc_py
@@ -6,6 +7,10 @@ from utils import run_interactive
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--record", action="store_true", help="Record an mp4 of the viewer to recordings/")
+    args = parser.parse_args()
+
     model_path = os.path.join(os.path.dirname(__file__), "../models/particle/scene.xml")
 
     # Initialize the C++ environment
@@ -30,7 +35,7 @@ def main():
 
     # Run simulation loop
     run_interactive(
-        env, optimizer, model_path, sim_dt=0.02, sim_steps_per_replan=10, init_kwargs={"keyframe_name": "home"}
+        env, optimizer, model_path, sim_dt=0.02, sim_steps_per_replan=10, init_kwargs={"keyframe_name": "home"}, record=args.record
     )
 
 

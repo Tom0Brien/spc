@@ -25,6 +25,7 @@ from utils import run_interactive
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--no_policy", action="store_true", help="Run without ONNX policy")
+    parser.add_argument("--record", action="store_true", help="Record an mp4 of the viewer to recordings/")
     args = parser.parse_args()
 
     model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/g1/scene_navigation.xml"))
@@ -83,6 +84,7 @@ def main():
         sim_dt=0.02,
         sim_steps_per_replan=5,
         init_kwargs={"keyframe_name": "knees_bent", "mocap_defaults": {0: ([3.0, 1.0, 0.05], [1.0, 0.0, 0.0, 0.0])}},
+        record=args.record,
     )
 
 

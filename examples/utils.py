@@ -1,9 +1,12 @@
+import os
 import sys
 import time
 
 import mujoco
 import mujoco.viewer
 import numpy as np
+
+from video import VideoRecorder
 
 
 def init_env_state(m_py, d_py, env, keyframe_name="knees_bent", mocap_defaults=None):
@@ -40,8 +43,23 @@ def init_env_state(m_py, d_py, env, keyframe_name="knees_bent", mocap_defaults=N
     env.forward()
 
 
-def run_interactive(env, optimizer, model_path, sim_dt=0.02, sim_steps_per_replan=10, init_kwargs=None):
-    """Generic interactive simulation loop for SPC tasks."""
+def run_interactive(
+    env,
+    optimizer,
+    model_path,
+    sim_dt=0.02,
+    sim_steps_per_replan=10,
+    init_kwargs=None,
+    record=False,
+    record_dir=None,
+    record_size=(720, 480),
+):
+    """Generic interactive simulation loop for SPC tasks.
+
+    Set ``record=True`` to save an mp4 of the viewer to ``record_dir``
+    (default: ``<repo>/recordings``). Recording captures one frame per replan
+    step, so the video plays at ``1 / sim_dt`` fps (real time).
+    """
     print("Starting interactive simulation...")
     print("Double click the target/goal marker and right-click drag to move it.")
 
@@ -55,32 +73,57 @@ def run_interactive(env, optimizer, model_path, sim_dt=0.02, sim_steps_per_repla
     else:
         init_env_state(m_py, d_py, env, **init_kwargs)
 
-    with mujoco.viewer.launch_passive(m_py, d_py) as viewer:
-        while viewer.is_running():
-            step_start = time.time()
+    recorder = None
+    renderer = None
+    if record:
+        width, height = record_size
+        if record_dir is None:
+            record_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../recordings"))
+        recorder = VideoRecorder(output_dir=record_dir, width=width, height=height, fps=1.0 / sim_dt)
+        # The offscreen buffer must be large enough for the requested resolution.
+        m_py.vis.global_.offwidth = width
+        m_py.vis.global_.offheight = height
+        if recorder.start():
+            renderer = mujoco.Renderer(m_py, height=height, width=width)
+        else:
+            recorder = None
 
-            # Read all mocap bodies from Python viewer and send to C++ SpcEnv
-            for i in range(m_py.nmocap):
-                env.set_mocap_pos(i, np.array(d_py.mocap_pos[i]))
-                env.set_mocap_quat(i, np.array(d_py.mocap_quat[i]))
+    try:
+        with mujoco.viewer.launch_passive(m_py, d_py) as viewer:
+            while viewer.is_running():
+                step_start = time.time()
 
-            # Step C++ MPC and simulation
-            compute_start = time.time()
-            env.step_mpc(optimizer, sim_steps_per_replan)
-            compute_time = time.time() - compute_start
+                # Read all mocap bodies from Python viewer and send to C++ SpcEnv
+                for i in range(m_py.nmocap):
+                    env.set_mocap_pos(i, np.array(d_py.mocap_pos[i]))
+                    env.set_mocap_quat(i, np.array(d_py.mocap_quat[i]))
 
-            # Sync back to Python viewer
-            d_py.qpos[:] = env.get_qpos()
-            mujoco.mj_forward(m_py, d_py)
-            viewer.sync()
+                # Step C++ MPC and simulation
+                compute_start = time.time()
+                env.step_mpc(optimizer, sim_steps_per_replan)
+                compute_time = time.time() - compute_start
 
-            # Real-time pacing
-            elapsed_compute = time.time() - step_start
-            time_until_next_step = sim_dt - elapsed_compute
-            if time_until_next_step > 0:
-                time.sleep(time_until_next_step)
+                # Sync back to Python viewer
+                d_py.qpos[:] = env.get_qpos()
+                mujoco.mj_forward(m_py, d_py)
+                viewer.sync()
 
-            total_elapsed = time.time() - step_start
-            rtf = sim_dt / total_elapsed if total_elapsed > 0 else 0.0
-            sys.stdout.write(f"\rRealtime rate: {rtf:.2f}x | Compute time: {compute_time * 1000:.2f}ms   ")
-            sys.stdout.flush()
+                # Capture a frame from the viewer camera if recording
+                if renderer is not None and recorder.is_recording:
+                    renderer.update_scene(d_py, viewer.cam)
+                    recorder.add_frame(renderer.render().tobytes())
+
+                # Real-time pacing
+                elapsed_compute = time.time() - step_start
+                time_until_next_step = sim_dt - elapsed_compute
+                if time_until_next_step > 0:
+                    time.sleep(time_until_next_step)
+
+                total_elapsed = time.time() - step_start
+                rtf = sim_dt / total_elapsed if total_elapsed > 0 else 0.0
+                sys.stdout.write(f"\rRealtime rate: {rtf:.2f}x | Compute time: {compute_time * 1000:.2f}ms   ")
+                sys.stdout.flush()
+    finally:
+        if recorder is not None:
+            recorder.stop()
+

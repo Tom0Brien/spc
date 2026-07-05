@@ -117,6 +117,7 @@ def init_state(m_py, d_py, env):
 def main():
     parser = argparse.ArgumentParser(description="Run Franka Push with RL policy + CEM residuals in C++")
     parser.add_argument("--no_policy", action="store_true", default=False, help="Disable the RL policy base action")
+    parser.add_argument("--record", action="store_true", help="Record an mp4 of the viewer to recordings/")
     args = parser.parse_args()
 
     model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/franka_push/scene.xml"))
@@ -159,7 +160,7 @@ def main():
     cem = spc_py.CEM(env, task, policy, config)
 
     run_interactive(
-        env, cem, model_path, sim_dt=0.02, sim_steps_per_replan=2, init_kwargs={"custom_init_fn": init_state}
+        env, cem, model_path, sim_dt=0.02, sim_steps_per_replan=2, init_kwargs={"custom_init_fn": init_state}, record=args.record
     )
 
 

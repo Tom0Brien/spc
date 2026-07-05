@@ -86,3 +86,6 @@ venv.bak/
 *.swp
 *.swo
 *~
+
+# Generated recordings
+recordings/

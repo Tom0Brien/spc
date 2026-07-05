@@ -46,6 +46,12 @@ uv run examples/t1_soccer.py
 uv run examples/t1_soccer_augmented.py
 ```
 
+Pass `--record` to save an mp4 of the viewer to `recordings/` (requires `ffmpeg` on the `PATH`):
+
+```bash
+uv run examples/g1_soccer.py --record
+```
+
 ## Development
 
 To contribute to the project, install the development dependencies which include automated formatting tools (`ruff` for Python, `clang-format` for C++).

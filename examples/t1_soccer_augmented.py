@@ -28,6 +28,7 @@ from utils import run_interactive
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--no_policy", action="store_true", help="Run without ONNX policy")
+    parser.add_argument("--record", action="store_true", help="Record an mp4 of the viewer to recordings/")
     args = parser.parse_args()
 
     model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/t1/scene_soccer.xml"))
@@ -139,6 +140,7 @@ def main():
         sim_dt=0.02,
         sim_steps_per_replan=10,
         init_kwargs={"custom_init_fn": custom_init},
+        record=args.record,
     )
 
 
