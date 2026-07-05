@@ -12,11 +12,12 @@ from datetime import datetime
 class VideoRecorder:
     """Pipe raw RGB frames to FFmpeg and encode an mp4."""
 
-    def __init__(self, output_dir, width=720, height=480, fps=30.0):
+    def __init__(self, output_dir, width=720, height=480, fps=30.0, filename_prefix="simulation"):
         self.output_dir = output_dir
         self.width = width
         self.height = height
         self.fps = fps
+        self.filename_prefix = filename_prefix
 
         self.ffmpeg_process = None
         self.video_path = None
@@ -30,8 +31,8 @@ class VideoRecorder:
 
         os.makedirs(self.output_dir, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.video_path = os.path.join(self.output_dir, f"simulation_{timestamp}.mp4")
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.video_path = os.path.join(self.output_dir, f"{self.filename_prefix}_{timestamp}.mp4")
 
         cmd = [
             "ffmpeg",

@@ -9,6 +9,18 @@ import numpy as np
 from video import VideoRecorder
 
 
+def _derive_recording_name(model_path):
+    """Derive a stable task-like recording name from a model path."""
+    model_dir = os.path.basename(os.path.dirname(model_path))
+    model_stem = os.path.splitext(os.path.basename(model_path))[0]
+
+    if model_stem == "scene":
+        return model_dir
+    if model_stem.startswith("scene_"):
+        return f"{model_dir}_{model_stem[len('scene_'):]}"
+    return model_stem
+
+
 def init_env_state(m_py, d_py, env, keyframe_name="knees_bent", mocap_defaults=None):
     """Generically initialize the environment to a keyframe and sync to C++."""
     # Reset to keyframe if available
@@ -53,12 +65,15 @@ def run_interactive(
     record=False,
     record_dir=None,
     record_size=(720, 480),
+    record_name=None,
 ):
     """Generic interactive simulation loop for SPC tasks.
 
     Set ``record=True`` to save an mp4 of the viewer to ``record_dir``
-    (default: ``<repo>/recordings``). Recording captures one frame per replan
-    step, so the video plays at ``1 / sim_dt`` fps (real time).
+    (default: ``<repo>/recordings``). The filename is prefixed with
+    ``record_name`` or a task-like name derived from ``model_path``.
+    Recording captures one frame per replan step, so the video plays at
+    ``1 / sim_dt`` fps (real time).
     """
     print("Starting interactive simulation...")
     print("Double click the target/goal marker and right-click drag to move it.")
@@ -79,7 +94,15 @@ def run_interactive(
         width, height = record_size
         if record_dir is None:
             record_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../recordings"))
-        recorder = VideoRecorder(output_dir=record_dir, width=width, height=height, fps=1.0 / sim_dt)
+        if record_name is None:
+            record_name = _derive_recording_name(model_path)
+        recorder = VideoRecorder(
+            output_dir=record_dir,
+            width=width,
+            height=height,
+            fps=1.0 / sim_dt,
+            filename_prefix=record_name,
+        )
         # The offscreen buffer must be large enough for the requested resolution.
         m_py.vis.global_.offwidth = width
         m_py.vis.global_.offheight = height
