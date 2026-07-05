@@ -1,4 +1,4 @@
-.PHONY: build rebuild format format-python format-cpp install-dev
+.PHONY: build rebuild clean format format-python format-cpp install-dev
 
 # First-time install: resolves dependencies and compiles the C++ backend.
 build:
@@ -8,6 +8,14 @@ build:
 # Assumes dependencies are already installed (run `make build` first).
 rebuild:
 	uv pip install -e . --force-reinstall --no-deps
+
+# Remove the installed extension and local caches for a clean slate.
+# Run `make build` afterwards to recompile from scratch.
+clean:
+	-uv pip uninstall spc_py
+	rm -rf .ruff_cache
+	find . -path ./.venv -prune -o -name '__pycache__' -type d -exec rm -rf {} +
+	find . -path ./.venv -prune -o -name '*.egg-info' -type d -exec rm -rf {} +
 
 install-dev:
 	uv pip install -e ".[dev]"
