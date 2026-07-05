@@ -1,5 +1,7 @@
 #include "spc/tasks/t1_soccer_augmented.h"
 
+#include <cmath>
+
 namespace spc {
 namespace tasks {
 
@@ -21,9 +23,27 @@ T1SoccerAugmented::T1SoccerAugmented(mjModel* model, const spc::core::TaskConfig
     residual_weight_ =
         config.numeric_params.count("residual_weight") ? config.numeric_params.at("residual_weight") : 0.05;
 
+    // Distance-to-ball gate for the residuals (metres): full strength within
+    // gate_near, zero beyond gate_far.
+    gate_near_ = config.numeric_params.count("gate_near") ? config.numeric_params.at("gate_near") : 0.45;
+    gate_far_ = config.numeric_params.count("gate_far") ? config.numeric_params.at("gate_far") : 0.75;
+
     // Residual kicks need close contact that the behind-ball penalty fights
     // against, so it is disabled by default for the augmented task.
     behind_weight_ = config.numeric_params.count("behind_weight") ? config.numeric_params.at("behind_weight") : 0.0;
+}
+
+double T1SoccerAugmented::ResidualGate(const mjData* data) const {
+    const mjtNum* ball_pos = data->xpos + 3 * soccer_ball_id_;
+    double dx = ball_pos[0] - data->qpos[0];
+    double dy = ball_pos[1] - data->qpos[1];
+    double rb = std::sqrt(dx * dx + dy * dy);
+    if (rb <= gate_near_)
+        return 1.0;
+    if (rb >= gate_far_)
+        return 0.0;
+    double t = (gate_far_ - rb) / (gate_far_ - gate_near_);
+    return t * t * (3.0 - 2.0 * t);  // smoothstep
 }
 
 void T1SoccerAugmented::ApplyControl(const mjModel* model, mjData* data, const float* control) const {
@@ -32,11 +52,17 @@ void T1SoccerAugmented::ApplyControl(const mjModel* model, mjData* data, const f
     // Run the RL policy on the velocity command to write base motor targets.
     T1Navigation::ApplyControl(model, data, control);
 
-    // Add residuals to the leg motor targets and re-clamp.
+    // Gate residuals by proximity to the ball: only engage the leg-swing
+    // adjustments for the kick, leaving the far-field approach velocity-only.
+    float gate = static_cast<float>(ResidualGate(data));
+    if (gate <= 0.0f)
+        return;
+
+    // Add gated residuals to the leg motor targets and re-clamp.
     const float* residuals = control + 3;
     for (int i = 0; i < leg_joint_count_; ++i) {
         int j = leg_joint_start_ + i;
-        float motor_target = static_cast<float>(data->ctrl[j]) + residuals[i];
+        float motor_target = static_cast<float>(data->ctrl[j]) + gate * residuals[i];
 
         if (motor_target < jnt_range_low_[j])
             motor_target = jnt_range_low_[j];

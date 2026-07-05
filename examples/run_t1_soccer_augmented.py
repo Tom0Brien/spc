@@ -57,6 +57,13 @@ def main():
         "leg_joint_start": 11,
         "leg_joint_count": 12,
         "residual_weight": 0.5,
+        # Distance-to-ball gate for the residuals: they fade to zero beyond
+        # gate_far and reach full strength within gate_near. This keeps the
+        # far-field approach a clean velocity-only problem (so CEM's samples all
+        # inform the velocity command instead of being diluted across 12 useless
+        # residual dims) and only engages the leg-swing kick next to the ball.
+        "gate_near": 0.45,
+        "gate_far": 0.75,
     }
 
     # We pass the same policy used for navigation, as it accepts velocity commands
@@ -72,11 +79,16 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    config.num_samples = 8  # 1 rollout per core; realtime on 8 physical cores
-    config.num_elites = 4
+    # The 15-dim augmented control (3 velocity + 12 leg residuals) needs more
+    # samples than the 3-dim tasks: at 8 samples the leg residuals are badly
+    # under-optimized. 16 samples (2 rollouts/core here) roughly halves the
+    # ball-to-goal distance. Runs ~0.47x realtime on 8 physical cores; a faster
+    # many-core CPU recovers realtime.
+    config.num_samples = 16
+    config.num_elites = 8
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 32  # longer lookahead so CEM can discover the leg-swing kick
+    config.plan_horizon_steps = 40  # longer lookahead so CEM can discover the leg-swing kick
     config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps (mujoco_playground settings)
     config.control_dim = 15  # vx, vy, vtheta + 12 leg residuals
     config.obs_dim = 85
