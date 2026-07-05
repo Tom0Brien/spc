@@ -31,10 +31,19 @@ uv pip install -e .
 Examples demonstrate the interactive planner loop for various tasks. They launch a native MuJoCo viewer where you can see the optimizer at work.
 
 ```bash
-uv run examples/run_particle.py
-uv run examples/run_franka_push.py
-uv run examples/run_g1_navigation.py
-uv run examples/run_g1_soccer.py
+# Particle reaching and Franka push
+uv run examples/particle.py
+uv run examples/franka_push.py
+
+# Unitree G1 humanoid: navigation and soccer
+uv run examples/g1_navigation.py
+uv run examples/g1_soccer.py
+uv run examples/g1_soccer_augmented.py
+
+# Booster T1 humanoid: navigation and soccer
+uv run examples/t1_navigation.py
+uv run examples/t1_soccer.py
+uv run examples/t1_soccer_augmented.py
 ```
 
 ## Development
@@ -54,3 +63,29 @@ make format
 > ```bash
 > make rebuild
 > ```
+>
+> To remove the installed extension and local caches for a clean slate (run `make build` afterwards to recompile from scratch):
+>
+> ```bash
+> make clean
+> ```
+
+## Testing
+
+The C++ unit tests use GoogleTest and are driven by CTest. They are only built
+from a standalone CMake configuration (they are skipped during the
+`scikit-build-core` wheel build), so configure a separate build directory:
+
+```bash
+# Configure and build the tests (and the rest of the C++ backend)
+uv run cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+uv run cmake --build build -j 8
+
+# Run the full test suite
+cd build && uv run ctest --output-on-failure
+```
+
+The suite covers the CEM optimizer (convergence, control bounds, MPPI update
+rule), the control spline interpolation, the `Particle` task cost, the task
+factory, and both policy backends — including a check that the hand-rolled
+`MLPPolicy` inference matches the ONNX reference.
