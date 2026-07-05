@@ -70,3 +70,53 @@ TEST(SplineTest, InterpLinear_MultiDim) {
     EXPECT_FLOAT_EQ(out[0], 10.0f);
     EXPECT_FLOAT_EQ(out[1], 20.0f);
 }
+
+TEST(SplineTest, InterpLinear_SingleStepHorizon) {
+    // total_steps <= 1 must fall back to t=0 (first knot) without dividing by zero.
+    int nu = 1;
+    int num_knots = 3;
+    std::vector<float> knots = {7.0f, 8.0f, 9.0f};
+    std::vector<float> out(nu);
+
+    InterpLinear(nu, num_knots, knots.data(), 0, 1, out.data());
+    EXPECT_FLOAT_EQ(out[0], 7.0f);
+
+    // total_steps = 0 is also guarded.
+    InterpLinear(nu, num_knots, knots.data(), 0, 0, out.data());
+    EXPECT_FLOAT_EQ(out[0], 7.0f);
+}
+
+TEST(SplineTest, InterpLinearNorm_ClampsOutOfRange) {
+    int nu = 1;
+    int num_knots = 3;
+    std::vector<float> knots = {0.0f, 1.0f, 2.0f};
+    std::vector<float> out(nu);
+
+    // t < 0 clamps to the first knot; no extrapolation below the range.
+    InterpLinearNorm(nu, num_knots, knots.data(), -0.5f, out.data());
+    EXPECT_FLOAT_EQ(out[0], 0.0f);
+
+    // t > 1 clamps to the last knot; no extrapolation above the range.
+    InterpLinearNorm(nu, num_knots, knots.data(), 1.5f, out.data());
+    EXPECT_FLOAT_EQ(out[0], 2.0f);
+
+    // Interior value interpolates as usual.
+    InterpLinearNorm(nu, num_knots, knots.data(), 0.25f, out.data());
+    EXPECT_FLOAT_EQ(out[0], 0.5f);
+}
+
+TEST(SplineTest, InterpLinearNorm_SingleKnot) {
+    // A single knot is a constant regardless of t (including out-of-range t).
+    int nu = 2;
+    int num_knots = 1;
+    std::vector<float> knots = {3.0f, -4.0f};
+    std::vector<float> out(nu);
+
+    InterpLinearNorm(nu, num_knots, knots.data(), 0.0f, out.data());
+    EXPECT_FLOAT_EQ(out[0], 3.0f);
+    EXPECT_FLOAT_EQ(out[1], -4.0f);
+
+    InterpLinearNorm(nu, num_knots, knots.data(), 5.0f, out.data());
+    EXPECT_FLOAT_EQ(out[0], 3.0f);
+    EXPECT_FLOAT_EQ(out[1], -4.0f);
+}

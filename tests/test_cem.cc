@@ -122,3 +122,91 @@ TEST(CEMTest, QuadraticOptimization) {
     mj_deleteData(current_state);
     mj_deleteModel(m);
 }
+
+// Helper: write the shared 1-actuator model and load it.
+static mjModel* LoadSlideModel(const char* filename) {
+    const char* xml = R"(
+    <mujoco>
+        <worldbody>
+            <body pos="0 0 0">
+                <joint name="j" type="slide" axis="1 0 0"/>
+                <geom type="sphere" size="1"/>
+            </body>
+        </worldbody>
+        <actuator>
+            <motor joint="j" ctrlrange="-1 1"/>
+        </actuator>
+    </mujoco>)";
+    FILE* fp = fopen(filename, "w");
+    fputs(xml, fp);
+    fclose(fp);
+
+    char error[1000];
+    return mj_loadXML(filename, nullptr, error, 1000);
+}
+
+// With u_max below the unconstrained optimum (0.5), the search must stay inside
+// the feasible box and settle at the boundary rather than overshoot.
+TEST(CEMTest, RespectsControlBounds) {
+    mjModel* m = LoadSlideModel("/tmp/dummy_model_bounds.xml");
+    ASSERT_NE(m, nullptr);
+
+    auto task = std::make_shared<QuadraticTask>();
+    auto policy = std::make_shared<DummyPolicy>();
+
+    algs::CEMConfig config;
+    config.num_samples = 256;
+    config.num_elites = 24;
+    config.num_knots = 4;
+    config.num_iterations = 5;
+    config.plan_horizon_steps = 10;
+    config.control_dim = 1;
+    config.sigma_init = 0.5f;
+    config.u_min = {-0.2f};
+    config.u_max = {0.2f};
+
+    algs::CEM cem(m, task, policy, config);
+
+    std::vector<float> best_action(config.control_dim, 0.0f);
+    mjData* current_state = mj_makeData(m);
+    cem.Optimize(current_state, best_action.data());
+
+    // Feasible optimum is the boundary at 0.2 (closest to the 0.5 target).
+    EXPECT_LE(best_action[0], 0.2f + 1e-4f);
+    EXPECT_GE(best_action[0], -0.2f - 1e-4f);
+    EXPECT_NEAR(best_action[0], 0.2f, 0.05f);
+
+    mj_deleteData(current_state);
+    mj_deleteModel(m);
+}
+
+// The MPPI update rule (softmax over all samples) should also converge toward
+// the unconstrained optimum on the convex quadratic.
+TEST(CEMTest, MPPIOptimization) {
+    mjModel* m = LoadSlideModel("/tmp/dummy_model_mppi.xml");
+    ASSERT_NE(m, nullptr);
+
+    auto task = std::make_shared<QuadraticTask>();
+    auto policy = std::make_shared<DummyPolicy>();
+
+    algs::CEMConfig config;
+    config.num_samples = 256;
+    config.num_knots = 4;
+    config.num_iterations = 8;
+    config.plan_horizon_steps = 10;
+    config.control_dim = 1;
+    config.sigma_init = 0.5f;
+    config.update_rule = 1;  // MPPI
+    config.mppi_lambda = 0.1f;
+
+    algs::CEM cem(m, task, policy, config);
+
+    std::vector<float> best_action(config.control_dim, 0.0f);
+    mjData* current_state = mj_makeData(m);
+    cem.Optimize(current_state, best_action.data());
+
+    EXPECT_NEAR(best_action[0], 0.5f, 0.1f);
+
+    mj_deleteData(current_state);
+    mj_deleteModel(m);
+}

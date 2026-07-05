@@ -12,7 +12,7 @@ os.environ["OMP_PROC_BIND"] = "true"
 os.environ["OMP_PLACES"] = "cores"
 
 
-def init_hydrax_state(m_py, d_py, env):
+def init_state(m_py, d_py, env):
     # Home keyframe values (extracted from model)
     home_qpos = np.array(
         [
@@ -159,7 +159,7 @@ def main():
     cem = spc_py.CEM(env, task, policy, config)
 
     run_interactive(
-        env, cem, model_path, sim_dt=0.02, sim_steps_per_replan=2, init_kwargs={"custom_init_fn": init_hydrax_state}
+        env, cem, model_path, sim_dt=0.02, sim_steps_per_replan=2, init_kwargs={"custom_init_fn": init_state}
     )
 
 

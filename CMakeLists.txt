@@ -127,14 +127,25 @@ target_compile_definitions(test_particle PRIVATE MODELS_DIR=${CMAKE_CURRENT_SOUR
 add_test(NAME ParticleTest COMMAND test_particle)
 
 add_executable(test_onnx tests/test_onnx.cc)
-target_link_libraries(test_onnx PRIVATE spc_core gtest_main onnxruntime)
+target_link_libraries(test_onnx PRIVATE spc_core GTest::gtest_main onnxruntime)
 add_test(NAME ONNXTest COMMAND test_onnx)
+
+add_executable(test_mlp_policy tests/test_mlp_policy.cc)
+target_link_libraries(test_mlp_policy PRIVATE spc_core GTest::gtest_main onnxruntime)
+target_compile_definitions(test_mlp_policy PRIVATE POLICIES_DIR=${CMAKE_CURRENT_SOURCE_DIR}/policies)
+add_test(NAME MLPPolicyTest COMMAND test_mlp_policy)
+
+add_executable(test_task_factory tests/test_task_factory.cc)
+target_link_libraries(test_task_factory PRIVATE spc_core GTest::gtest_main)
+add_test(NAME TaskFactoryTest COMMAND test_task_factory)
 
 include(GoogleTest)
 gtest_discover_tests(test_cem)
 gtest_discover_tests(test_spline)
 gtest_discover_tests(test_particle)
 gtest_discover_tests(test_onnx)
+gtest_discover_tests(test_mlp_policy)
+gtest_discover_tests(test_task_factory)
 endif()
 
 # -----------------------------------------------------------------------------
