@@ -23,6 +23,14 @@ struct OptimizerConfig {
     int control_dim = 1;
     int obs_dim = 1;      // Size of the observation array
     int num_threads = 8;  // Number of OpenMP threads to use
+
+    // Phase-indexed control dims: the trailing phase_dims entries of the
+    // control vector are interpolated periodically over one cycle of
+    // phase_freq (Hz) against absolute sim time, instead of over the horizon.
+    // Useful for gait-locked terms (e.g. leg residuals), which then stay
+    // valid across replans without any warm-start re-timing.
+    int phase_dims = 0;
+    float phase_freq = 0.0f;
 };
 
 /**
@@ -63,6 +71,10 @@ protected:
     virtual void GetBestAction(const mjData* current_state, float* best_action_out) = 0;
 
     void EvaluateRollouts(const mjData* current_state, const std::vector<float>& samples, std::vector<double>& costs);
+
+    // Overwrite the trailing phase_dims entries of control with the periodic
+    // interpolation of knots at the gait phase corresponding to sim time.
+    void InterpPhaseDims(const float* knots, double time, float* control) const;
 
     mjModel* model_;
     std::shared_ptr<core::Task> task_;

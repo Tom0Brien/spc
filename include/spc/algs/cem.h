@@ -37,6 +37,10 @@ struct CEMConfig : public OptimizerConfig {
     // noise). 0 = white noise (default); 0.5-0.9 = temporally smooth samples.
     float noise_rho = 0.0f;
 
+    // Execute the best-cost sample's action instead of the updated mean's
+    // (iCEM). The mean still parameterizes the sampling distribution.
+    bool use_best_sample = false;
+
     // RNG seed for sampling.
     unsigned int seed = 1337;
 
@@ -71,6 +75,8 @@ private:
     std::vector<float> stddev_;
     std::vector<float> kept_elites_;  // top elite_keep knot vectors from the previous replan
     int num_kept_ = 0;
+    std::vector<float> best_knots_;  // best-cost sample of the latest update
+    bool have_best_ = false;
     std::vector<std::mt19937> rngs_;
 
     // Expanded per-dimension arrays (size = control_dim)

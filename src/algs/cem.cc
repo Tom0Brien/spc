@@ -64,13 +64,20 @@ void CEM::PrepareForReplan() {
     if (num_knots < 2 || horizon < 2)
         return;
 
+    // Phase-indexed dims live on the gait cycle, not the horizon: they stay
+    // valid across replans as-is and must not be re-timed.
+    int time_dims = nu - cem_config_.phase_dims;
+    if (time_dims <= 0)
+        return;
+
     std::vector<float> shifted(mean_.size());
     auto shift_knots = [&](float* knots) {
         for (int j = 0; j < num_knots; ++j) {
             float t = static_cast<float>(j) / (num_knots - 1) + static_cast<float>(shift) / (horizon - 1);
             utils::InterpLinearNorm(nu, num_knots, knots, t, &shifted[j * nu]);
         }
-        std::copy(shifted.begin(), shifted.end(), knots);
+        for (int j = 0; j < num_knots; ++j)
+            std::copy(&shifted[j * nu], &shifted[j * nu] + time_dims, knots + j * nu);
     };
 
     shift_knots(mean_.data());
@@ -210,14 +217,23 @@ void CEM::UpdateDistribution(const std::vector<float>& samples, const std::vecto
         const float* knots = &samples[indices[e] * n_params];
         std::copy(knots, knots + n_params, &kept_elites_[e * n_params]);
     }
+
+    if (cem_config_.use_best_sample) {
+        const float* best = &samples[indices[0] * n_params];
+        best_knots_.assign(best, best + n_params);
+        have_best_ = true;
+    }
 }
 
 void CEM::GetBestAction(const mjData* current_state, float* best_action_out) {
     int nu = cem_config_.control_dim;
     int num_knots = cem_config_.num_knots;
 
-    // Evaluate mean spline at t=0 to get the residual control
-    utils::InterpLinear(nu, num_knots, mean_.data(), 0, cem_config_.plan_horizon_steps, best_action_out);
+    // Evaluate spline at t=0 to get the control: the updated mean by default,
+    // or the best-cost rollout's knots when use_best_sample is set (iCEM).
+    const float* knots = (cem_config_.use_best_sample && have_best_) ? best_knots_.data() : mean_.data();
+    utils::InterpLinear(nu, num_knots, knots, 0, cem_config_.plan_horizon_steps, best_action_out);
+    InterpPhaseDims(knots, current_state->time, best_action_out);
 }
 
 }  // namespace algs

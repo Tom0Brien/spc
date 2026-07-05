@@ -2,6 +2,7 @@
 
 #include <omp.h>
 
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 
@@ -76,6 +77,7 @@ void Optimizer::EvaluateRollouts(const mjData* current_state, const std::vector<
         for (int step = 0; step < horizon_steps; ++step) {
             // Interpolate residual control from knots
             utils::InterpLinear(nu, num_knots, sample_knots, step, horizon_steps, current_control);
+            InterpPhaseDims(sample_knots, d->time, current_control);
 
             // Set control in MuJoCo data by delegating to Task
             if (task_) {
@@ -102,6 +104,29 @@ void Optimizer::EvaluateRollouts(const mjData* current_state, const std::vector<
             total_cost += task_->TerminalCost(model_, d);
         }
         costs[i] = total_cost;
+    }
+}
+
+void Optimizer::InterpPhaseDims(const float* knots, double time, float* control) const {
+    int phase_dims = config_.phase_dims;
+    if (phase_dims <= 0)
+        return;
+
+    int nu = config_.control_dim;
+    int num_knots = config_.num_knots;
+
+    // Knots span one gait cycle and wrap around (periodic spline).
+    double cycle = time * config_.phase_freq;
+    cycle -= std::floor(cycle);  // [0, 1)
+    float knot_pos = static_cast<float>(cycle) * num_knots;
+    int idx0 = std::min(num_knots - 1, static_cast<int>(knot_pos));
+    int idx1 = (idx0 + 1) % num_knots;
+    float alpha = knot_pos - idx0;
+
+    for (int dim = nu - phase_dims; dim < nu; ++dim) {
+        float k0 = knots[idx0 * nu + dim];
+        float k1 = knots[idx1 * nu + dim];
+        control[dim] = k0 + alpha * (k1 - k0);
     }
 }
 
