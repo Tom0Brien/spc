@@ -43,6 +43,9 @@ def main():
         "upright_weight": 2.0,
         "height_weight": 0.5,
         "ctrl_weight": 0.01,
+        "vx_limit": 1.5,
+        "vy_limit": 1.2,
+        "vtheta_limit": 1.5,
     }
     task = spc_py.create_task("T1Navigation", env, task_params)
 
@@ -71,9 +74,9 @@ def main():
     config.replan_shift_steps = 1  # replan every ctrl step: warm-start shifted mean
     config.elite_keep = 2  # re-inject previous replan's best samples (iCEM)
 
-    # Velocity commands bounded to the RL policy's training range
-    config.u_min = [-1.0, -0.8, -1.0]
-    config.u_max = [1.0, 0.8, 1.0]
+    # Velocity commands:
+    config.u_min = [-1.5, -1.2, -1.5]
+    config.u_max = [1.5, 1.2, 1.5]
 
     cem = spc_py.CEM(env, task, policy, config)
 

@@ -48,6 +48,9 @@ def main():
         "upright_weight": 2.0,  # penalize trunk tilt (prevents falls)
         "behind_weight": 2.0,  # stay on the far side of the ball from the goal
         "ctrl_weight": 0.01,
+        "vx_limit": 1.5,
+        "vy_limit": 1.2,
+        "vtheta_limit": 1.5,
     }
 
     # We pass the same policy used for navigation, as it accepts velocity commands
@@ -82,9 +85,9 @@ def main():
     config.replan_shift_steps = 1  # replan every ctrl step: warm-start shifted mean
     config.elite_keep = 2  # re-inject previous replan's best samples (iCEM)
 
-    # Velocity commands bounded to the RL policy's training range
-    config.u_min = [-1.0, -0.8, -1.0]
-    config.u_max = [1.0, 0.8, 1.0]
+    # Velocity commands:
+    config.u_min = [-1.5, -1.2, -1.5]
+    config.u_max = [1.5, 1.2, 1.5]
 
     cem = spc_py.CEM(env, task, policy, config)
 

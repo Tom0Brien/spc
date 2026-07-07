@@ -51,6 +51,11 @@ def main():
         "upright_weight": 2.0,  # penalize trunk tilt (prevents falls)
         "behind_weight": 0.0,  # off: residual kicks need close contact
         "ctrl_weight": 0.01,
+        # Experiment: raise the policy-command clamp above the default
+        # {1.0, 0.8, 1.0} (must match the CEM velocity bounds below).
+        "vx_limit": 1.5,
+        "vy_limit": 1.2,
+        "vtheta_limit": 1.5,
 
         # Augmented (leg residual) params
         # T1 joint order is head(2), arms(8), waist(1), left leg(6), right leg(6),
@@ -101,9 +106,8 @@ def main():
     config.elite_keep = 0
 
     # Per-dimension bounds and sampling spread:
-    # velocity commands in [-1, 1] (vy in [-0.8, 0.8]), leg residuals in [-0.3, 0.3] rad
-    config.u_min = [-1.0, -0.8, -1.0] + [-0.3] * 12
-    config.u_max = [1.0, 0.8, 1.0] + [0.3] * 12
+    config.u_min = [-1.5, -1.2, -1.5] + [-0.3] * 12
+    config.u_max = [1.5, 1.2, 1.5] + [0.3] * 12
     config.sigma_init_per_dim = [0.5] * 3 + [0.15] * 12
 
     cem = spc_py.CEM(env, task, policy, config)
