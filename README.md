@@ -35,21 +35,23 @@ Examples demonstrate the interactive planner loop for various tasks. They launch
 uv run examples/particle.py
 uv run examples/franka_push.py
 
-# Unitree G1 humanoid: navigation and soccer
+# Unitree G1 humanoid: navigation, pass, and shoot
 uv run examples/g1_navigation.py
-uv run examples/g1_soccer.py
-uv run examples/g1_soccer_augmented.py
+uv run examples/g1_pass.py
+uv run examples/g1_pass_augmented.py
 
-# Booster T1 humanoid: navigation and soccer
+# Booster T1 humanoid: navigation, pass, and shoot
 uv run examples/t1_navigation.py
-uv run examples/t1_soccer.py
-uv run examples/t1_soccer_augmented.py
+uv run examples/t1_pass.py
+uv run examples/t1_pass_augmented.py
+uv run examples/t1_shoot.py
+uv run examples/t1_shoot_augmented.py
 ```
 
 Pass `--record` to save an mp4 of the viewer to `recordings/` (requires `ffmpeg` on the `PATH`):
 
 ```bash
-uv run examples/g1_soccer.py --record
+uv run examples/g1_pass.py --record
 ```
 
 ## Development

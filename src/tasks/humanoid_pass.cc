@@ -1,4 +1,4 @@
-#include "spc/tasks/humanoid_soccer.h"
+#include "spc/tasks/humanoid_pass.h"
 
 #include <cmath>
 #include <stdexcept>
@@ -7,7 +7,7 @@
 namespace spc {
 namespace tasks {
 
-HumanoidSoccer::HumanoidSoccer(mjModel* model, const core::TaskConfig& config, HumanoidSpec spec)
+HumanoidPass::HumanoidPass(mjModel* model, const core::TaskConfig& config, HumanoidSpec spec)
     : HumanoidNavigation(model, config, std::move(spec)) {
     auto num = [&config](const char* key, double fallback) {
         auto it = config.numeric_params.find(key);
@@ -21,34 +21,31 @@ HumanoidSoccer::HumanoidSoccer(mjModel* model, const core::TaskConfig& config, H
         throw std::runtime_error("Could not find soccer ball body: " + ball_name);
     }
 
-    // Ball freejoint qvel address (for ball velocity shaping)
-    int ball_jnt = model->body_jntadr[soccer_ball_id_];
-    ball_dofadr_ = (ball_jnt >= 0) ? model->jnt_dofadr[ball_jnt] : -1;
-
     standoff_distance_ = num("standoff_distance", 0.5);
     ball_goal_weight_ = num("ball_goal_weight", 1.0);
-    ball_vel_weight_ = num("ball_vel_weight", 0.0);
+    ball_goal_scale_ = num("ball_goal_scale", 0.5);
     // Keeps the velocity-only controller from bumping the ball off-line. The
     // augmented task overrides this to 0 (residual kicks need close,
     // momentarily misaligned contact).
     behind_weight_ = num("behind_weight", 2.0);
 
-    // Soccer-specific defaults for the navigation weights
+    // Pass-specific defaults for the navigation weights
     pos_weight_ = num("pos_weight", 0.3);
     ori_weight_ = num("ori_weight", 0.2);
     height_weight_ = num("height_weight", 0.5);
     ctrl_weight_ = num("ctrl_weight", 0.01);
 }
 
-double HumanoidSoccer::RunningCost(const mjModel* model, const mjData* data, const float* control) const {
+double HumanoidPass::RunningCost(const mjModel* model, const mjData* data, const float* control) const {
     const mjtNum* ball_pos = data->xpos + 3 * soccer_ball_id_;
     const mjtNum* goal_pos = data->mocap_pos;  // goal from mocap body 0
 
-    // Ball to goal cost
+    // Ball to goal cost: pseudo-Huber so a distant goal gives a constant
+    // gradient instead of quadratically dominating the stability terms
     double b2g_x = goal_pos[0] - ball_pos[0];
     double b2g_y = goal_pos[1] - ball_pos[1];
     double ball_goal_dist = std::sqrt(b2g_x * b2g_x + b2g_y * b2g_y);
-    double ball_goal_cost = ball_goal_dist * ball_goal_dist;
+    double ball_goal_cost = PseudoHuber(ball_goal_dist, ball_goal_scale_);
 
     // Desired robot position (behind ball, along the ball->goal line)
     double dir_x = b2g_x / (ball_goal_dist + 1e-6);
@@ -61,13 +58,11 @@ double HumanoidSoccer::RunningCost(const mjModel* model, const mjData* data, con
 
     double px = rx - desired_x;
     double py = ry - desired_y;
-    double robot_pos_cost = px * px + py * py;
-    double dist_to_desired = std::sqrt(robot_pos_cost);
+    double dist_to_desired = std::sqrt(px * px + py * py);
+    double robot_pos_cost = PseudoHuber(dist_to_desired, pos_scale_);
 
     // Robot yaw from the base quaternion
-    const mjtNum* quat = data->qpos + 3;
-    double yaw =
-        std::atan2(2.0 * (quat[0] * quat[3] + quat[1] * quat[2]), 1.0 - 2.0 * (quat[2] * quat[2] + quat[3] * quat[3]));
+    double yaw = YawFromQuat(data->qpos + 3);
 
     double approach_angle = std::atan2(desired_y - ry, desired_x - rx);
     double kick_angle = std::atan2(goal_pos[1] - ry, goal_pos[0] - rx);
@@ -76,9 +71,8 @@ double HumanoidSoccer::RunningCost(const mjModel* model, const mjData* data, con
     double transition = 1.0 / (1.0 + std::exp(-((dist_to_desired - 0.6) / 0.2)));
     double desired_yaw = transition * approach_angle + (1.0 - transition) * kick_angle;
 
-    double ori_err = yaw - desired_yaw;
-    ori_err = std::atan2(std::sin(ori_err), std::cos(ori_err));
-    double robot_ori_cost = ori_err * ori_err;
+    double ori_err = WrapAngle(yaw - desired_yaw);
+    double robot_ori_cost = PseudoHuber(ori_err, ori_scale_);
 
     // Height cost
     double height_cost = 0.0;
@@ -97,13 +91,6 @@ double HumanoidSoccer::RunningCost(const mjModel* model, const mjData* data, con
         upright_cost = gx * gx + gy * gy;
     }
 
-    // Ball velocity shaping: reward ball velocity toward the goal
-    double ball_vel_cost = 0.0;
-    if (ball_dofadr_ >= 0) {
-        const mjtNum* ball_vel = data->qvel + ball_dofadr_;  // freejoint: linear vel first
-        ball_vel_cost = -(ball_vel[0] * dir_x + ball_vel[1] * dir_y);
-    }
-
     // Behind-ball alignment: penalize being on the goal side of the ball,
     // gated by proximity so it only acts near the ball
     double rb_x = ball_pos[0] - rx;
@@ -118,11 +105,11 @@ double HumanoidSoccer::RunningCost(const mjModel* model, const mjData* data, con
         ctrl_cost += control[i] * control[i];
 
     return ball_goal_weight_ * ball_goal_cost + pos_weight_ * robot_pos_cost + ori_weight_ * robot_ori_cost +
-           height_weight_ * height_cost + upright_weight_ * upright_cost + ball_vel_weight_ * ball_vel_cost +
-           behind_weight_ * behind_cost + ctrl_weight_ * ctrl_cost;
+           height_weight_ * height_cost + upright_weight_ * upright_cost + behind_weight_ * behind_cost +
+           ctrl_weight_ * ctrl_cost;
 }
 
-double HumanoidSoccer::TerminalCost(const mjModel* model, const mjData* data) const {
+double HumanoidPass::TerminalCost(const mjModel* model, const mjData* data) const {
     float zero_ctrl[3] = {0.0f, 0.0f, 0.0f};
     return RunningCost(model, data, zero_ctrl);
 }

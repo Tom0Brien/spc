@@ -1,0 +1,162 @@
+<mujoco model="t1 scene shoot">
+  <!-- Inherits t1.xml's simulation options (dt=.002, Euler, iterations=3/ls=5),
+       matching the mujoco_playground T1 joystick training/deploy settings. -->
+  <include file="t1.xml"/>
+
+  <statistic center="0 0 0.5" extent="1.2" meansize="0.04"/>
+
+  <visual>
+    <headlight diffuse=".8 .8 .8" ambient=".2 .2 .2" specular="1 1 1"/>
+    <rgba force="1 0 0 1"/>
+    <global azimuth="140" elevation="-20"/>
+    <map force="0.01"/>
+    <scale forcewidth="0.3" contactwidth="0.5" contactheight="0.2"/>
+    <quality shadowsize="8192"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="1 1 1" rgb2="1 1 1" width="800" height="800"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="1 1 1" rgb2="1 1 1"
+      markrgb="0 0 0" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0"/>
+
+    <texture type="2d" name="grass_pitch" builtin="checker" rgb1="0.22 0.52 0.18" rgb2="0.17 0.44 0.15"
+      width="2048" height="2048"/>
+    <material name="grass_pitch" texture="grass_pitch" texuniform="true" texrepeat="18 12" reflectance="0.03" specular="0.08" shininess="0.1"/>
+
+    <texture name="soccer_ball" type="cube"
+      fileup="../common/assets/soccer_ball_up.png"
+      filedown="../common/assets/soccer_ball_down.png"
+      filefront="../common/assets/soccer_ball_front.png"
+      fileback="../common/assets/soccer_ball_back.png"
+      fileleft="../common/assets/soccer_ball_left.png"
+      fileright="../common/assets/soccer_ball_right.png"/>
+    <material name="soccer_ball" texture="soccer_ball"/>
+  </asset>
+
+  <worldbody>
+    <geom name="floor" size="0 0 0.01" type="plane" material="groundplane" friction="1.2 0.1 0.5" priority="1" contype="1" conaffinity="0" condim="6"/>
+
+    <!-- Adult-size (M-Field) pitch: 14m x 9m with official markings. -->
+    <body name="pitch_markings" pos="0 0 0">
+      <geom name="pitch_base" type="box" size="8 5.5 0.002" pos="0 0 0.002" material="grass_pitch" contype="0" conaffinity="0"/>
+
+      <!-- Mowing stripes for more realistic grass appearance. -->
+      <geom name="stripe_00" type="box" size="0.5 5.5 0.001" pos="-7.5 0 0.003" rgba="0.14 0.33 0.12 0.18" contype="0" conaffinity="0"/>
+      <geom name="stripe_01" type="box" size="0.5 5.5 0.001" pos="-5.5 0 0.003" rgba="0.14 0.33 0.12 0.18" contype="0" conaffinity="0"/>
+      <geom name="stripe_02" type="box" size="0.5 5.5 0.001" pos="-3.5 0 0.003" rgba="0.14 0.33 0.12 0.18" contype="0" conaffinity="0"/>
+      <geom name="stripe_03" type="box" size="0.5 5.5 0.001" pos="-1.5 0 0.003" rgba="0.14 0.33 0.12 0.18" contype="0" conaffinity="0"/>
+      <geom name="stripe_04" type="box" size="0.5 5.5 0.001" pos="0.5 0 0.003" rgba="0.14 0.33 0.12 0.18" contype="0" conaffinity="0"/>
+      <geom name="stripe_05" type="box" size="0.5 5.5 0.001" pos="2.5 0 0.003" rgba="0.14 0.33 0.12 0.18" contype="0" conaffinity="0"/>
+      <geom name="stripe_06" type="box" size="0.5 5.5 0.001" pos="4.5 0 0.003" rgba="0.14 0.33 0.12 0.18" contype="0" conaffinity="0"/>
+      <geom name="stripe_07" type="box" size="0.5 5.5 0.001" pos="6.5 0 0.003" rgba="0.14 0.33 0.12 0.18" contype="0" conaffinity="0"/>
+
+      <!-- Line width set to 0.08m (allowed range: 0.05m to 0.12m). -->
+      <geom name="line_touch_top" type="box" size="7 0.04 0.001" pos="0 4.5 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_touch_bottom" type="box" size="7 0.04 0.001" pos="0 -4.5 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_goal_left" type="box" size="0.04 4.5 0.001" pos="-7 0 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_goal_right" type="box" size="0.04 4.5 0.001" pos="7 0 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_halfway" type="box" size="0.04 4.5 0.001" pos="0 0 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+
+      <!-- Center circle diameter: 3.0m. Disks sit below the field lines (z=0.008) so the halfway line stays visible. Inner disk uses the grass texture to blend with the pitch. -->
+      <geom name="line_center_circle_outer" type="cylinder" size="1.5 0.001" pos="0 0 0.006" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_center_circle_inner" type="cylinder" size="1.42 0.001" pos="0 0 0.007" material="grass_pitch" contype="0" conaffinity="0"/>
+      <geom name="line_center_mark" type="cylinder" size="0.05 0.001" pos="0 0 0.0084" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+
+      <!-- Penalty marks distance: 2.0m from each goal line. -->
+      <geom name="line_penalty_mark_left" type="cylinder" size="0.05 0.001" pos="-5 0 0.0084" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_penalty_mark_right" type="cylinder" size="0.05 0.001" pos="5 0 0.0084" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+
+      <!-- Penalty area: length 3.0m, width 6.0m. -->
+      <geom name="line_penalty_left_front" type="box" size="0.04 3.0 0.001" pos="-4 0 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_penalty_left_top" type="box" size="1.5 0.04 0.001" pos="-5.5 3 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_penalty_left_bottom" type="box" size="1.5 0.04 0.001" pos="-5.5 -3 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_penalty_right_front" type="box" size="0.04 3.0 0.001" pos="4 0 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_penalty_right_top" type="box" size="1.5 0.04 0.001" pos="5.5 3 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_penalty_right_bottom" type="box" size="1.5 0.04 0.001" pos="5.5 -3 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+
+      <!-- Goal area: length 1.0m, width 4.0m. -->
+      <geom name="line_goal_area_left_front" type="box" size="0.04 2.0 0.001" pos="-6 0 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_goal_area_left_top" type="box" size="0.5 0.04 0.001" pos="-6.5 2 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_goal_area_left_bottom" type="box" size="0.5 0.04 0.001" pos="-6.5 -2 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_goal_area_right_front" type="box" size="0.04 2.0 0.001" pos="6 0 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_goal_area_right_top" type="box" size="0.5 0.04 0.001" pos="6.5 2 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+      <geom name="line_goal_area_right_bottom" type="box" size="0.5 0.04 0.001" pos="6.5 -2 0.008" rgba="1 1 1 1" contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Shoot target: the mocap marker carries the shaded goal region. Its
+         position/yaw define the goal line for the task cost (x axis = shot
+         direction); the box spans the goal mouth (goal_half_width=1.2 in the
+         examples matches the +-1.25 posts minus the post radius). -->
+    <body name="goal_marker" mocap="true" pos="7 0 0">
+      <geom name="goal_region" type="box" size="0.03 1.2 0.875" pos="0 0 0.9"
+            rgba="0.15 0.85 0.25 0.3" contype="0" conaffinity="0"/>
+      <geom name="goal_region_base" type="box" size="0.35 1.2 0.001" pos="-0.32 0 0.01"
+            rgba="0.15 0.85 0.25 0.35" contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Soccer goal posts (red team) -->
+        <body name="goal_red" pos="-7 0 0">
+      <geom name="goal_box_red" type="box" size="0.5 1.25 0.9"
+        pos="-0.5 0 0.9" rgba="1 1 1 0.12" contype="0" conaffinity="0"/>
+      <geom name="goal_post_red_left" type="cylinder" size="0.06 0.9"
+        pos="0 1.25 0.9" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+      <geom name="goal_post_red_right" type="cylinder" size="0.06 0.9"
+        pos="0 -1.25 0.9" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+      <geom name="goal_crossbar_red" type="capsule" size="0.06 1.25"
+        pos="0 0 1.8" quat="0.707 0.707 0 0" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+    </body>
+
+    <!-- Soccer goal posts (green team / opponent) -->
+        <body name="goal_green" pos="7 0 0">
+      <geom name="goal_box_green" type="box" size="0.5 1.25 0.9"
+        pos="0.5 0 0.9" rgba="1 1 1 0.12" contype="0" conaffinity="0"/>
+      <geom name="goal_post_green_left" type="cylinder" size="0.06 0.9"
+        pos="0 1.25 0.9" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+      <geom name="goal_post_green_right" type="cylinder" size="0.06 0.9"
+        pos="0 -1.25 0.9" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+      <geom name="goal_crossbar_green" type="capsule" size="0.06 1.25"
+        pos="0 0 1.8" quat="0.707 0.707 0 0" rgba="1 1 1 1" contype="1" conaffinity="1"/>
+    </body>
+
+    <!-- Soccer ball -->
+    <body name="soccer_ball" pos="0 0 0.117">
+      <freejoint name="ball_root"/>
+      <geom name="ball" type="sphere" size="0.117"
+            condim="6" priority="1"
+            solref="0.01 0.8" material="soccer_ball"/>
+      <inertial pos="0 0 0" mass="0.45" diaginertia="0.011 0.011 0.011"/>
+    </body>
+  </worldbody>
+
+  <contact>
+    <!-- Essential Ball contacts -->
+    <pair name="ball_left_foot" geom1="ball" geom2="left_foot" condim="3" friction="1.2 0.1 0.5"/>
+    <pair name="ball_right_foot" geom1="ball" geom2="right_foot" condim="3" friction="1.2 0.1 0.5"/>
+    <pair name="ball_floor" geom1="ball" geom2="floor" condim="6" friction="1 1 0.005 0.02 0.02"/>
+  </contact>
+
+  <keyframe>
+    <key name="home"
+      qpos="
+    3.8 0 0.665
+    1 0 0 0
+    0 0
+    0 -1.4 0 -0.4
+    0 1.4 0 0.4
+    0
+    -0.2 0 0 0.4 -0.2 0
+    -0.2 0 0 0.4 -0.2 0
+    5 0 0.117
+    1 0 0 0
+    "
+      ctrl="
+    0 0
+    0 -1.4 0 -0.4
+    0 1.4 0 0.4
+    0
+    -0.2 0 0 0.4 -0.2 0
+    -0.2 0 0 0.4 -0.2 0
+    "/>
+  </keyframe>
+</mujoco>

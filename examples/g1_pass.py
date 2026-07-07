@@ -1,12 +1,12 @@
-"""G1 Soccer MPC example using SPC C++ backend.
+"""G1 Pass MPC example using SPC C++ backend.
 
-Uses the G1Soccer task with CEM optimization to navigate a G1 humanoid
+Uses the G1Pass task with CEM optimization to navigate a G1 humanoid
 robot to a soccer ball and push it toward a goal position.
 
 The velocity commands (vx, vy, vtheta) are optimized by CEM, and a trained
 ONNX locomotion policy converts them to motor targets at each step.
 
-Usage: python3 examples/run_g1_soccer.py [--no_policy]
+Usage: python3 examples/g1_pass.py [--no_policy]
 """
 
 import os
@@ -39,7 +39,7 @@ def main():
         "gait_freq": 1.5,
         "target_height": 0.75,
         
-        # Soccer-specific weights
+        # Pass-specific weights
         "standoff_distance": 0.5,
         "ball_goal_weight": 1.0,
         "pos_weight": 0.3,
@@ -51,7 +51,7 @@ def main():
     }
     
     # We pass the same policy used for navigation, as it accepts velocity commands
-    task = spc_py.create_task("G1Soccer", env, task_params)
+    task = spc_py.create_task("G1Pass", env, task_params)
 
     policy = None
     if not args.no_policy:

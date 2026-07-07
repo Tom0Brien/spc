@@ -1,12 +1,14 @@
-"""Booster T1 Soccer MPC example using SPC C++ backend.
+"""Booster T1 Shoot MPC example using SPC C++ backend (velocity-only control).
 
-Uses the T1Soccer task with CEM optimization to navigate a Booster T1 humanoid
-robot to a soccer ball and push it toward a goal position.
+Uses the T1Shoot task with CEM optimization to drive a soccer ball through a
+goal *region* at maximum power. The mocap marker defines a goal line: its yaw
+sets the shooting direction and goal_half_width the region's lateral extent.
+Unlike T1Pass, the ball flying past the line costs nothing (overshoot is free).
 
 The velocity commands (vx, vy, vtheta) are optimized by CEM, and a trained
 ONNX locomotion policy converts them to motor targets at each step.
 
-Usage: python3 examples/run_t1_soccer.py [--no_policy]
+Usage: python3 examples/t1_shoot.py [--no_policy]
 """
 
 import os
@@ -28,7 +30,7 @@ def main():
     parser.add_argument("--record", action="store_true", help="Record an mp4 of the viewer to recordings/")
     args = parser.parse_args()
 
-    model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/t1/scene_soccer.xml"))
+    model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/t1/scene_shoot.xml"))
     policy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../policies/t1_navigation.onnx"))
 
     print(f"Loading model from {model_path}")
@@ -39,14 +41,17 @@ def main():
         "gait_freq": 1.5,
         "target_height": 0.665,
 
-        # Soccer-specific weights
+        # Shoot-specific weights
         "standoff_distance": 0.25,  # T1 is smaller than G1: stand closer so the feet reach the ball
-        "ball_goal_weight": 1.0,
+        "ball_goal_weight": 2.0,  # shortfall to the goal line (zero once crossed)
+        "goal_half_width": 1.2,  # matches the scene's goal mouth (posts at +-1.25)
+        "lateral_weight": 1.0,  # penalize lateral miss beyond the half-width
+        "shoot_power_weight": 0.5,  # reward ball speed along the shooting direction
         "pos_weight": 0.3,
         "ori_weight": 0.2,
         "height_weight": 0.5,
         "upright_weight": 2.0,  # penalize trunk tilt (prevents falls)
-        "behind_weight": 2.0,  # stay on the far side of the ball from the goal
+        "behind_weight": 2.0,  # stay behind the ball relative to the shot direction
         "ctrl_weight": 0.01,
         "vx_limit": 1.5,
         "vy_limit": 1.2,
@@ -54,7 +59,7 @@ def main():
     }
 
     # We pass the same policy used for navigation, as it accepts velocity commands
-    task = spc_py.create_task("T1Soccer", env, task_params)
+    task = spc_py.create_task("T1Shoot", env, task_params)
 
     policy = None
     if not args.no_policy:
@@ -68,7 +73,7 @@ def main():
     config = spc_py.CEMConfig()
     # Rollouts plan on a coarser model (dt=0.004 x5 substeps = 0.02s/control
     # step, ~1.7x cheaper than the real dt=0.002 x10); the saving buys the long
-    # horizon the dribble needs. ~0.5x realtime on 8 cores.
+    # horizon the approach needs. ~0.5x realtime on 8 cores.
     config.num_samples = 16
     config.num_elites = 8
     config.num_knots = 4
@@ -91,38 +96,17 @@ def main():
 
     cem = spc_py.CEM(env, task, policy, config)
 
-    def custom_init(m_py, d_py, spc_env):
-        import mujoco
-        from utils import init_env_state
-
-        init_env_state(m_py, d_py, spc_env, keyframe_name="home")
-
-        # Set soccer ball initial position
-        ball_id = mujoco.mj_name2id(m_py, mujoco.mjtObj.mjOBJ_BODY, "soccer_ball")
-        if ball_id != -1:
-            jnt_id = m_py.body_jntadr[ball_id]
-            qpos_adr = m_py.jnt_qposadr[jnt_id]
-            d_py.qpos[qpos_adr:qpos_adr + 3] = [2.0, 0.5, 0.117]
-            d_py.qpos[qpos_adr + 3:qpos_adr + 7] = [1.0, 0.0, 0.0, 0.0]
-
-        # Set goal position via mocap body
-        if m_py.nmocap > 0:
-            d_py.mocap_pos[0] = [4.75, 0.0, 0.05]
-            d_py.mocap_quat[0] = [1.0, 0.0, 0.0, 0.0]
-
-        mujoco.mj_forward(m_py, d_py)
-        spc_env.set_qpos(d_py.qpos)
-        spc_env.set_mocap_pos(0, d_py.mocap_pos[0])
-        spc_env.set_mocap_quat(0, d_py.mocap_quat[0])
-        spc_env.forward()
-
+    # The scene keyframe sets up the shot: robot at (3.8, 0) facing the goal,
+    # ball on the penalty spot (5, 0). The mocap goal region defaults to the
+    # goal mouth at x=7 (its yaw is the shooting direction; drag/rotate it in
+    # the viewer to move the target).
     run_interactive(
         env,
         cem,
         model_path,
         sim_dt=0.02,
         sim_steps_per_replan=10,
-        init_kwargs={"custom_init_fn": custom_init},
+        init_kwargs={"keyframe_name": "home"},
         record=args.record,
     )
 

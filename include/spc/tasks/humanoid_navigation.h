@@ -3,6 +3,7 @@
 #include <mujoco/mujoco.h>
 
 #include <array>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,29 @@
 
 namespace spc {
 namespace tasks {
+
+/**
+ * @brief Pseudo-Huber norm of a scaled error: sqrt((err/scale)^2 + 1) - 1.
+ *
+ * Quadratic near zero, linear beyond ~scale. Used for all tracking terms so a
+ * distant goal contributes a constant gradient instead of a quadratic blowup
+ * that drowns the stability terms. Returns ~1 at err ~= 1.7*scale, so weights
+ * are comparable across terms.
+ */
+inline double PseudoHuber(double err, double scale) {
+    double x = err / scale;
+    return std::sqrt(x * x + 1.0) - 1.0;
+}
+
+/// Yaw (z rotation) extracted from a wxyz quaternion.
+inline double YawFromQuat(const mjtNum* q) {
+    return std::atan2(2.0 * (q[0] * q[3] + q[1] * q[2]), 1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3]));
+}
+
+/// Wrap an angle difference to [-pi, pi].
+inline double WrapAngle(double a) {
+    return std::atan2(std::sin(a), std::cos(a));
+}
 
 /**
  * @brief Robot-specific constants for the shared humanoid tasks.
@@ -75,6 +99,11 @@ protected:
     double upright_weight_;
     double height_weight_;
     double ctrl_weight_;
+
+    // Characteristic error scales for the pseudo-Huber tracking terms: the
+    // cost transitions from quadratic to linear around these magnitudes.
+    double pos_scale_;  // meters
+    double ori_scale_;  // radians
 
     // Joint limits for clamping motor targets
     std::vector<float> jnt_range_low_;

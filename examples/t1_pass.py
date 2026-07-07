@@ -1,15 +1,12 @@
-"""Booster T1 Soccer (augmented) MPC example using SPC C++ backend.
+"""Booster T1 Pass MPC example using SPC C++ backend.
 
-Uses the T1SoccerAugmented task with CEM optimization. The control vector is
-extended to 15 dims:
-  - control[0:3]  : velocity commands (vx, vy, vtheta) for the RL policy
-  - control[3:15] : residual adjustments for the 12 leg joint targets
+Uses the T1Pass task with CEM optimization to navigate a Booster T1 humanoid
+robot to a soccer ball and push it toward a goal position.
 
-A trained ONNX locomotion policy converts the velocity commands to motor
-targets at each step; CEM additionally optimizes the leg residuals for fine
-kicking adjustments.
+The velocity commands (vx, vy, vtheta) are optimized by CEM, and a trained
+ONNX locomotion policy converts them to motor targets at each step.
 
-Usage: python3 examples/run_t1_soccer_augmented.py [--no_policy]
+Usage: python3 examples/t1_pass.py [--no_policy]
 """
 
 import os
@@ -42,35 +39,22 @@ def main():
         "gait_freq": 1.5,
         "target_height": 0.665,
 
-        # Soccer-specific weights
-        "standoff_distance": 0.35,  # augmented: leg-swing residuals extend the foot's reach
-        "ball_goal_weight": 1.0,
+        # Pass-specific weights
+        "standoff_distance": 0.25,  # T1 is smaller than G1: stand closer so the feet reach the ball
+        "ball_goal_weight": 2.0,  # tuned: faster drive to goal (median 6.5s vs 6.7s over 6-episode eval)
         "pos_weight": 0.3,
         "ori_weight": 0.2,
         "height_weight": 0.5,
         "upright_weight": 2.0,  # penalize trunk tilt (prevents falls)
-        "behind_weight": 0.0,  # off: residual kicks need close contact
+        "behind_weight": 2.0,  # stay on the far side of the ball from the goal
         "ctrl_weight": 0.01,
-        # Experiment: raise the policy-command clamp above the default
-        # {1.0, 0.8, 1.0} (must match the CEM velocity bounds below).
         "vx_limit": 1.5,
         "vy_limit": 1.2,
         "vtheta_limit": 1.5,
-
-        # Augmented (leg residual) params
-        # T1 joint order is head(2), arms(8), waist(1), left leg(6), right leg(6),
-        # so the 12 leg joints start at index 11.
-        "leg_joint_start": 11,
-        "leg_joint_count": 12,
-        "residual_weight": 0.5,
-        # Residuals fade to zero beyond gate_far and reach full strength within
-        # gate_near, keeping the far-field approach velocity-only.
-        "gate_near": 0.45,
-        "gate_far": 0.75,
     }
 
     # We pass the same policy used for navigation, as it accepts velocity commands
-    task = spc_py.create_task("T1SoccerAugmented", env, task_params)
+    task = spc_py.create_task("T1Pass", env, task_params)
 
     policy = None
     if not args.no_policy:
@@ -83,32 +67,27 @@ def main():
 
     config = spc_py.CEMConfig()
     # Rollouts plan on a coarser model (dt=0.004 x5 substeps = 0.02s/control
-    # step, ~1.7x cheaper than the real dt=0.002 x10); the saving buys the
-    # sample count and horizon the 15-dim control needs. ~0.45x realtime on 8
-    # cores.
-    config.num_samples = 24
-    config.num_elites = 12
+    # step, ~1.7x cheaper than the real dt=0.002 x10); the saving buys the long
+    # horizon the dribble needs. ~0.5x realtime on 8 cores.
+    config.num_samples = 16
+    config.num_elites = 8
     config.num_knots = 4
     config.num_iterations = 1
-    config.plan_horizon_steps = 48
+    config.plan_horizon_steps = 64
     config.sim_substeps = 5
     config.plan_timestep = 0.004  # coarse planning dt (real sim stays at the model's 0.002)
-    config.control_dim = 15  # vx, vy, vtheta + 12 leg residuals
+    config.control_dim = 3  # vx, vy, vtheta
     config.obs_dim = 85
     config.num_threads = 8
     config.sigma_init = 0.5
     config.sigma_min = 0.05
     config.explore_fraction = 0.5
-    # Warm-start shift and elite reuse stay off: leg residuals are
-    # gait-phase-locked, so re-timed means and stale elites from the previous
-    # replan desynchronize from the gait (verified to hurt the task).
-    config.replan_shift_steps = 0
-    config.elite_keep = 0
+    config.replan_shift_steps = 1  # replan every ctrl step: warm-start shifted mean
+    config.elite_keep = 2  # re-inject previous replan's best samples (iCEM)
 
-    # Per-dimension bounds and sampling spread:
-    config.u_min = [-1.5, -1.2, -1.5] + [-0.3] * 12
-    config.u_max = [1.5, 1.2, 1.5] + [0.3] * 12
-    config.sigma_init_per_dim = [0.5] * 3 + [0.15] * 12
+    # Velocity commands:
+    config.u_min = [-1.5, -1.2, -1.5]
+    config.u_max = [1.5, 1.2, 1.5]
 
     cem = spc_py.CEM(env, task, policy, config)
 

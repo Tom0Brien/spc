@@ -43,6 +43,8 @@ HumanoidNavigation::HumanoidNavigation(mjModel* model, const core::TaskConfig& c
     upright_weight_ = num("upright_weight", 2.0);
     height_weight_ = num("height_weight", 0.5);
     ctrl_weight_ = num("ctrl_weight", 0.01);
+    pos_scale_ = num("pos_scale", 0.5);
+    ori_scale_ = num("ori_scale", 0.5);
 
     // Joint limits (joints 1..njoints, skipping the floating base joint 0)
     jnt_range_low_.resize(spec_.njoints);
@@ -130,18 +132,15 @@ double HumanoidNavigation::RunningCost(const mjModel* model, const mjData* data,
     const mjtNum* goal_pos = data->mocap_pos;
     const mjtNum* goal_quat = data->mocap_quat;
 
-    // Position error (2D, floating base)
+    // Position error (2D, floating base): pseudo-Huber so a distant goal gives
+    // a constant gradient instead of quadratically dominating the stability terms
     double dx = data->qpos[0] - goal_pos[0];
     double dy = data->qpos[1] - goal_pos[1];
-    double position_cost = dx * dx + dy * dy;
+    double position_cost = PseudoHuber(std::sqrt(dx * dx + dy * dy), pos_scale_);
 
-    // Yaw error: qz component of the relative quaternion
-    const mjtNum* robot_quat = data->qpos + 3;
-    mjtNum goal_inv[4];
-    mju_negQuat(goal_inv, goal_quat);
-    mjtNum quat_diff[4];
-    mju_mulQuat(quat_diff, robot_quat, goal_inv);
-    double orientation_cost = quat_diff[3] * quat_diff[3];
+    // Yaw error, wrapped to [-pi, pi]
+    double yaw_err = WrapAngle(YawFromQuat(data->qpos + 3) - YawFromQuat(goal_quat));
+    double orientation_cost = PseudoHuber(yaw_err, ori_scale_);
 
     // Upright cost: xy components of gravity in the IMU frame (0 when upright)
     double upright_cost = 0.0;

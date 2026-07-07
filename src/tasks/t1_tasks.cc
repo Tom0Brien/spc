@@ -1,9 +1,10 @@
 // Booster T1 (23 DoF) registrations of the shared humanoid tasks.
 
 #include "spc/core/task_factory.h"
+#include "spc/tasks/humanoid_augmented.h"
 #include "spc/tasks/humanoid_navigation.h"
-#include "spc/tasks/humanoid_soccer.h"
-#include "spc/tasks/humanoid_soccer_augmented.h"
+#include "spc/tasks/humanoid_pass.h"
+#include "spc/tasks/humanoid_shoot.h"
 
 namespace spc {
 namespace tasks {
@@ -43,15 +44,26 @@ public:
     T1Navigation(mjModel* model, const core::TaskConfig& config) : HumanoidNavigation(model, config, T1Spec()) {}
 };
 
-class T1Soccer : public HumanoidSoccer {
+class T1Pass : public HumanoidPass {
 public:
-    T1Soccer(mjModel* model, const core::TaskConfig& config) : HumanoidSoccer(model, config, T1Spec()) {}
+    T1Pass(mjModel* model, const core::TaskConfig& config) : HumanoidPass(model, config, T1Spec()) {}
 };
 
-class T1SoccerAugmented : public HumanoidSoccerAugmented {
+class T1PassAugmented : public HumanoidAugmented<HumanoidPass> {
 public:
-    T1SoccerAugmented(mjModel* model, const core::TaskConfig& config)
-        : HumanoidSoccerAugmented(model, config, T1Spec()) {}
+    T1PassAugmented(mjModel* model, const core::TaskConfig& config)
+        : HumanoidAugmented<HumanoidPass>(model, config, T1Spec()) {}
+};
+
+class T1Shoot : public HumanoidShoot {
+public:
+    T1Shoot(mjModel* model, const core::TaskConfig& config) : HumanoidShoot(model, config, T1Spec()) {}
+};
+
+class T1ShootAugmented : public HumanoidAugmented<HumanoidShoot> {
+public:
+    T1ShootAugmented(mjModel* model, const core::TaskConfig& config)
+        : HumanoidAugmented<HumanoidShoot>(model, config, T1Spec()) {}
 };
 
 }  // namespace
@@ -59,5 +71,7 @@ public:
 }  // namespace spc
 
 REGISTER_TASK("T1Navigation", spc::tasks::T1Navigation, T1Navigation)
-REGISTER_TASK("T1Soccer", spc::tasks::T1Soccer, T1Soccer)
-REGISTER_TASK("T1SoccerAugmented", spc::tasks::T1SoccerAugmented, T1SoccerAugmented)
+REGISTER_TASK("T1Pass", spc::tasks::T1Pass, T1Pass)
+REGISTER_TASK("T1PassAugmented", spc::tasks::T1PassAugmented, T1PassAugmented)
+REGISTER_TASK("T1Shoot", spc::tasks::T1Shoot, T1Shoot)
+REGISTER_TASK("T1ShootAugmented", spc::tasks::T1ShootAugmented, T1ShootAugmented)
