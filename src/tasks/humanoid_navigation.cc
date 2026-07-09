@@ -31,6 +31,12 @@ HumanoidNavigation::HumanoidNavigation(mjModel* model, const core::TaskConfig& c
     height_site_id_ = mj_name2id(model, mjOBJ_SITE, height_site.c_str());
 
     action_scale_ = static_cast<float>(num("action_scale", spec_.action_scale));
+    action_scale_joint_.assign(spec_.njoints, action_scale_);
+    if (!spec_.action_scale_vec.empty()) {
+        for (int i = 0; i < spec_.njoints; ++i) {
+            action_scale_joint_[i] = spec_.action_scale_vec[i] * action_scale_;
+        }
+    }
     gait_freq_ = static_cast<float>(num("gait_freq", spec_.gait_freq));
 
     vel_limit_[0] = static_cast<float>(num("vx_limit", spec_.vel_limit[0]));
@@ -112,7 +118,7 @@ void HumanoidNavigation::GetObservation(const mjModel* model, const mjData* data
     // 7. Last action (njoints): (ctrl - default_pose) / action_scale
     for (int i = 0; i < n; ++i) {
         float motor_target = static_cast<float>(data->ctrl[i]);
-        obs_out[idx++] = (motor_target - spec_.default_pose[i]) / action_scale_;
+        obs_out[idx++] = (motor_target - spec_.default_pose[i]) / action_scale_joint_[i];
     }
 
     // 8. Gait phase (4): cos(phase_left), cos(phase_right), sin(phase_left), sin(phase_right)
@@ -213,7 +219,7 @@ void HumanoidNavigation::ApplyControl(const mjModel* model, mjData* data, const 
 
     // Motor targets: default_pose + action * scale, clamped to joint limits
     for (int i = 0; i < n; ++i) {
-        float motor_target = spec_.default_pose[i] + policy_action[i] * action_scale_;
+        float motor_target = spec_.default_pose[i] + policy_action[i] * action_scale_joint_[i];
 
         if (motor_target < jnt_range_low_[i])
             motor_target = jnt_range_low_[i];

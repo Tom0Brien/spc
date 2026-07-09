@@ -49,6 +49,10 @@ struct HumanoidSpec {
     std::string upright_site;  // IMU site used for gravity projection
     std::string height_site;   // site whose z is regulated to target_height
     float action_scale = 0.5f;
+    // Per-joint action scales (K1: 0.25*effort_limit/kp per booster_train).
+    // Empty means uniform action_scale; otherwise njoints entries, each
+    // multiplied by action_scale.
+    std::vector<float> action_scale_vec;
     float gait_freq = 1.5f;
     std::array<float, 3> vel_limit = {1.0f, 1.0f, 1.0f};  // vx, vy, vtheta command bounds
     double target_height = 0.0;
@@ -90,6 +94,7 @@ protected:
     int height_site_id_;
 
     float action_scale_;
+    std::vector<float> action_scale_joint_;  // per-joint scale (njoints)
     float gait_freq_;
     float vel_limit_[3];
 
