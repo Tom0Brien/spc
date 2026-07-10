@@ -64,6 +64,7 @@ public:
         for (int step = 0; step < sim_steps_per_replan; ++step) {
             mj_step(m_, d_);
         }
+        return py::array_t<float>(ctrl_dim, best_action.data());
     }
 
     void SetMocapPos(int mocap_id, py::array_t<double> pos) {
