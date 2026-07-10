@@ -42,6 +42,7 @@ HumanoidNavigation::HumanoidNavigation(mjModel* model, const core::TaskConfig& c
     vel_limit_[0] = static_cast<float>(num("vx_limit", spec_.vel_limit[0]));
     vel_limit_[1] = static_cast<float>(num("vy_limit", spec_.vel_limit[1]));
     vel_limit_[2] = static_cast<float>(num("vtheta_limit", spec_.vel_limit[2]));
+    cmd_deadzone_ = static_cast<float>(num("cmd_deadzone", 0.1));
 
     target_height_ = num("target_height", spec_.target_height);
     pos_weight_ = num("pos_weight", 1.0);
@@ -196,6 +197,15 @@ void HumanoidNavigation::ApplyControl(const mjModel* model, mjData* data, const 
             cmd = vel_limit_[i];
         obs[9 + i] = cmd;
         cmd_norm_sq += cmd * cmd;
+    }
+
+    // Commands below the policy's trained stand threshold (playground
+    // stand_still cost gates on |cmd| < 0.1) snap to exactly zero: the policy
+    // only stands cleanly at zero, and a sampling optimizer never lands there
+    // on its own, leaving the robot shuffling at the stand/walk boundary.
+    if (cmd_norm_sq < cmd_deadzone_ * cmd_deadzone_) {
+        obs[9] = obs[10] = obs[11] = 0.0f;
+        cmd_norm_sq = 0.0f;
     }
 
     // Some policies (T1) were trained with the gait phase pinned to pi when

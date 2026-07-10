@@ -1,7 +1,9 @@
 // Booster K1 (22 DoF) registrations of the shared humanoid tasks.
 
 #include "spc/core/task_factory.h"
+#include "spc/tasks/humanoid_augmented.h"
 #include "spc/tasks/humanoid_navigation.h"
+#include "spc/tasks/humanoid_pass.h"
 
 namespace spc {
 namespace tasks {
@@ -13,11 +15,11 @@ HumanoidSpec K1Spec() {
     // Default pose from the mujoco_playground K1 Joystick "home" keyframe (the
     // joint targets the RL policy was trained with).
     spec.default_pose = {
-        0.0f,  0.0f,                              // head (2)
-        0.0f,  -1.3f, 0.0f, 0.0f,                 // left arm (4)
-        0.0f,  1.3f,  0.0f, 0.0f,                 // right arm (4)
-        -0.2f, 0.0f,  0.0f, 0.4f,  -0.2f, 0.0f,   // left leg (6)
-        -0.2f, 0.0f,  0.0f, 0.4f,  -0.2f, 0.0f    // right leg (6)
+        0.0f,  0.0f,                            // head (2)
+        0.0f,  -1.3f, 0.0f, 0.0f,               // left arm (4)
+        0.0f,  1.3f,  0.0f, 0.0f,               // right arm (4)
+        -0.2f, 0.0f,  0.0f, 0.4f, -0.2f, 0.0f,  // left leg (6)
+        -0.2f, 0.0f,  0.0f, 0.4f, -0.2f, 0.0f   // right leg (6)
     };
     spec.gyro_name = "gyro";
     spec.linvel_name = "local_linvel";
@@ -49,8 +51,21 @@ public:
     K1Navigation(mjModel* model, const core::TaskConfig& config) : HumanoidNavigation(model, config, K1Spec()) {}
 };
 
+class K1Pass : public HumanoidPass {
+public:
+    K1Pass(mjModel* model, const core::TaskConfig& config) : HumanoidPass(model, config, K1Spec()) {}
+};
+
+class K1PassAugmented : public HumanoidAugmented<HumanoidPass> {
+public:
+    K1PassAugmented(mjModel* model, const core::TaskConfig& config)
+        : HumanoidAugmented<HumanoidPass>(model, config, K1Spec()) {}
+};
+
 }  // namespace
 }  // namespace tasks
 }  // namespace spc
 
 REGISTER_TASK("K1Navigation", spc::tasks::K1Navigation, K1Navigation)
+REGISTER_TASK("K1Pass", spc::tasks::K1Pass, K1Pass)
+REGISTER_TASK("K1PassAugmented", spc::tasks::K1PassAugmented, K1PassAugmented)

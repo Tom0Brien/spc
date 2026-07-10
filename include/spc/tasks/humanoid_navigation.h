@@ -97,6 +97,7 @@ protected:
     std::vector<float> action_scale_joint_;  // per-joint scale (njoints)
     float gait_freq_;
     float vel_limit_[3];
+    float cmd_deadzone_;  // |cmd| below this snaps to zero (policy stand threshold)
 
     double target_height_;
     double pos_weight_;

@@ -47,7 +47,7 @@ public:
     mjModel* GetModel() { return m_; }
     mjData* GetData() { return d_; }
 
-    void StepMPC(std::shared_ptr<spc::algs::Optimizer> optimizer, int sim_steps_per_replan) {
+    py::array_t<float> StepMPC(std::shared_ptr<spc::algs::Optimizer> optimizer, int sim_steps_per_replan) {
         int ctrl_dim = optimizer->GetControlDim();
         std::vector<float> best_action(ctrl_dim);
         optimizer->Optimize(d_, best_action.data());

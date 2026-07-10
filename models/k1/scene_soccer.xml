@@ -1,9 +1,9 @@
-<mujoco model="t1 scene soccer">
-  <!-- Inherits t1.xml's simulation options (dt=.002, Euler, iterations=3/ls=5),
-       matching the mujoco_playground T1 joystick training/deploy settings. -->
-  <include file="t1.xml"/>
+<mujoco model="k1 scene soccer">
+  <!-- Inherits k1.xml's simulation options (dt=.002, Euler, iterations=3/ls=5),
+       matching the mujoco_playground K1 joystick training/deploy settings. -->
+  <include file="k1.xml"/>
 
-  <statistic center="0 0 0.5" extent="1.2" meansize="0.04"/>
+  <statistic center="0 0 0.4" extent="1.2" meansize="0.04"/>
 
   <visual>
     <headlight diffuse=".8 .8 .8" ambient=".2 .2 .2" specular="1 1 1"/>
@@ -113,13 +113,13 @@
         pos="0 0 1.8" quat="0.707 0.707 0 0" rgba="1 1 1 1" contype="1" conaffinity="1"/>
     </body>
 
-    <!-- Soccer ball -->
-    <body name="soccer_ball" pos="0 0 0.117">
+    <!-- Soccer ball (smaller/lighter than regulation for the K1's shorter reach) -->
+    <body name="soccer_ball" pos="0 0 0.09">
       <freejoint name="ball_root"/>
-      <geom name="ball" type="sphere" size="0.117"
+      <geom name="ball" type="sphere" size="0.09"
             condim="6" priority="1"
             solref="0.01 0.8" material="soccer_ball"/>
-      <inertial pos="0 0 0" mass="0.45" diaginertia="0.011 0.011 0.011"/>
+      <inertial pos="0 0 0" mass="0.3" diaginertia="0.00432 0.00432 0.00432"/>
     </body>
   </worldbody>
 
@@ -133,22 +133,20 @@
   <keyframe>
     <key name="home"
       qpos="
-    0 0 0.665
+    0 0 0.543
     1 0 0 0
     0 0
-    0 -1.4 0 -0.4
-    0 1.4 0 0.4
-    0
+    0 -1.3 0 0
+    0 1.3 0 0
     -0.2 0 0 0.4 -0.2 0
     -0.2 0 0 0.4 -0.2 0
-    0 0 0.117
+    0 0 0.09
     1 0 0 0
     "
       ctrl="
     0 0
-    0 -1.4 0 -0.4
-    0 1.4 0 0.4
-    0
+    0 -1.3 0 0
+    0 1.3 0 0
     -0.2 0 0 0.4 -0.2 0
     -0.2 0 0 0.4 -0.2 0
     "/>
