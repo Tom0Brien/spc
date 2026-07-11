@@ -93,7 +93,7 @@ uv run cmake --build build -j 8
 cd build && uv run ctest --output-on-failure
 ```
 
-The suite covers the CEM optimizer (convergence, control bounds, MPPI update
-rule), the control spline interpolation, the `Particle` task cost, the task
+The suite covers the CEM optimizer (convergence, control bounds), the
+control spline interpolation, the `Particle` task cost, the task
 factory, and both policy backends — including a check that the hand-rolled
 `MLPPolicy` inference matches the ONNX reference.

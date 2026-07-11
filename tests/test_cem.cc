@@ -179,34 +179,3 @@ TEST(CEMTest, RespectsControlBounds) {
     mj_deleteData(current_state);
     mj_deleteModel(m);
 }
-
-// The MPPI update rule (softmax over all samples) should also converge toward
-// the unconstrained optimum on the convex quadratic.
-TEST(CEMTest, MPPIOptimization) {
-    mjModel* m = LoadSlideModel("/tmp/dummy_model_mppi.xml");
-    ASSERT_NE(m, nullptr);
-
-    auto task = std::make_shared<QuadraticTask>();
-    auto policy = std::make_shared<DummyPolicy>();
-
-    algs::CEMConfig config;
-    config.num_samples = 256;
-    config.num_knots = 4;
-    config.num_iterations = 8;
-    config.plan_horizon_steps = 10;
-    config.control_dim = 1;
-    config.sigma_init = 0.5f;
-    config.update_rule = 1;  // MPPI
-    config.mppi_lambda = 0.1f;
-
-    algs::CEM cem(m, task, policy, config);
-
-    std::vector<float> best_action(config.control_dim, 0.0f);
-    mjData* current_state = mj_makeData(m);
-    cem.Optimize(current_state, best_action.data());
-
-    EXPECT_NEAR(best_action[0], 0.5f, 0.1f);
-
-    mj_deleteData(current_state);
-    mj_deleteModel(m);
-}

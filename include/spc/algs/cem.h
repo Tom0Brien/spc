@@ -22,13 +22,6 @@ struct CEMConfig : public OptimizerConfig {
     // steps of the previous plan get executed between replans). 0 disables.
     int replan_shift_steps = 0;
 
-    // Distribution update rule:
-    //   0 = CEM with rank-weighted elites (default)
-    //   1 = MPPI: softmax-weighted average over ALL samples with temperature
-    //       mppi_lambda; sigma stays fixed at sigma_init (no adaptation).
-    int update_rule = 0;
-    float mppi_lambda = 1.0f;
-
     // iCEM-style elite reuse: re-inject the top elite_keep samples from the
     // previous replan into the new population (after samples[0] = mean).
     int elite_keep = 0;

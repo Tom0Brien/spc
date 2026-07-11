@@ -186,8 +186,6 @@ PYBIND11_MODULE(spc_py, m) {
         .def_readwrite("sigma_min", &spc::algs::CEMConfig::sigma_min)
         .def_readwrite("explore_fraction", &spc::algs::CEMConfig::explore_fraction)
         .def_readwrite("replan_shift_steps", &spc::algs::CEMConfig::replan_shift_steps)
-        .def_readwrite("update_rule", &spc::algs::CEMConfig::update_rule)
-        .def_readwrite("mppi_lambda", &spc::algs::CEMConfig::mppi_lambda)
         .def_readwrite("elite_keep", &spc::algs::CEMConfig::elite_keep)
         .def_readwrite("noise_rho", &spc::algs::CEMConfig::noise_rho)
         .def_readwrite("use_best_sample", &spc::algs::CEMConfig::use_best_sample)

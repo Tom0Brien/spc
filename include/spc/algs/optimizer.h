@@ -37,7 +37,7 @@ struct OptimizerConfig {
     // never enter the elite set, so it stops stepping. Lossless for the CEM
     // elite update, but requires nonnegative running/terminal costs; disable
     // for tasks whose cost can be negative. Only saves wall time when
-    // num_samples > num_threads. (MPPI ignores this: it weights all samples.)
+    // num_samples > num_threads.
     bool prune_dominated = true;
 
     // Coarse planning model: physics stepping dominates rollout cost, so the

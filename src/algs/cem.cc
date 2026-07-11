@@ -45,10 +45,7 @@ CEM::CEM(mjModel* model, std::shared_ptr<core::Task> task, std::shared_ptr<core:
 
     // Dominated rollouts can stop early once they can't rank among the
     // samples the update consumes: the elite set plus re-injected elites.
-    // MPPI weights every sample, so pruning stays off there.
-    if (cem_config_.update_rule == 0) {
-        prune_rank_ = std::max(std::min(cem_config_.num_elites, config.num_samples), cem_config_.elite_keep);
-    }
+    prune_rank_ = std::max(std::min(cem_config_.num_elites, config.num_samples), cem_config_.elite_keep);
 
     int max_threads = omp_get_max_threads();
     rngs_.resize(max_threads);
@@ -124,7 +121,6 @@ void CEM::SampleKnots(std::vector<float>& samples) {
     // With noise_rho > 0, noise is AR(1)-correlated across knots (iCEM
     // colored noise), which biases exploration toward temporally smooth
     // control variations.
-    bool mppi = (cem_config_.update_rule == 1);
     float rho = cem_config_.noise_rho;
     float rho_c = std::sqrt(std::max(0.0f, 1.0f - rho * rho));
     std::normal_distribution<float> dist(0.0f, 1.0f);
@@ -141,8 +137,8 @@ void CEM::SampleKnots(std::vector<float>& samples) {
 
         for (int k = 0; k < n_params; ++k) {
             int dim = k % nu;
-            // MPPI keeps a fixed sampling covariance; CEM adapts it via elites.
-            float stddev = (mppi || is_explore) ? sigma_init_dim_[dim] : stddev_[k];
+            // Explore samples keep the initial sigma; the rest use the adapted one.
+            float stddev = is_explore ? sigma_init_dim_[dim] : stddev_[k];
             float perturb = stddev * eps[k];
             samples[i * n_params + k] = clamp_dim(mean_[k] + perturb, dim);
             if (has_mirror)
@@ -162,60 +158,37 @@ void CEM::UpdateDistribution(const std::vector<float>& samples, const std::vecto
     std::partial_sort(indices.begin(), indices.begin() + sort_n, indices.end(),
                       [&](int a, int b) { return costs[a] < costs[b]; });
 
-    if (cem_config_.update_rule == 1) {
-        // MPPI: softmax-weighted average over ALL samples. Every rollout
-        // contributes, which wastes nothing at small population sizes; the
-        // sampling covariance stays fixed at sigma_init.
-        double cost_min = costs[indices[0]];
-        std::vector<float> weights(num_samples);
-        float weight_sum = 0.0f;
-        for (int i = 0; i < num_samples; ++i) {
-            weights[i] = std::exp(static_cast<float>(-(costs[i] - cost_min)) / cem_config_.mppi_lambda);
-            weight_sum += weights[i];
-        }
-        for (float& w : weights)
-            w /= weight_sum;
+    // Rank-based elite weights (CMA-ES style): w_e ~ ln(E + 0.5) - ln(e + 1).
+    // Emphasizing the best elites extracts more from small populations than a
+    // uniform average over a hard elite cut.
+    std::vector<float> weights(num_elites);
+    float weight_sum = 0.0f;
+    for (int e = 0; e < num_elites; ++e) {
+        weights[e] = std::log(num_elites + 0.5f) - std::log(e + 1.0f);
+        weight_sum += weights[e];
+    }
+    for (float& w : weights)
+        w /= weight_sum;
 
-        std::fill(mean_.begin(), mean_.end(), 0.0f);
-        for (int i = 0; i < num_samples; ++i) {
-            const float* knots = &samples[i * n_params];
-            for (int k = 0; k < n_params; ++k) {
-                mean_[k] += weights[i] * knots[k];
-            }
+    std::fill(mean_.begin(), mean_.end(), 0.0f);
+    for (int e = 0; e < num_elites; ++e) {
+        const float* elite_knots = &samples[indices[e] * n_params];
+        for (int k = 0; k < n_params; ++k) {
+            mean_[k] += weights[e] * elite_knots[k];
         }
-    } else {
-        // Rank-based elite weights (CMA-ES style): w_e ~ ln(E + 0.5) - ln(e + 1).
-        // Emphasizing the best elites extracts more from small populations than a
-        // uniform average over a hard elite cut.
-        std::vector<float> weights(num_elites);
-        float weight_sum = 0.0f;
-        for (int e = 0; e < num_elites; ++e) {
-            weights[e] = std::log(num_elites + 0.5f) - std::log(e + 1.0f);
-            weight_sum += weights[e];
-        }
-        for (float& w : weights)
-            w /= weight_sum;
+    }
 
-        std::fill(mean_.begin(), mean_.end(), 0.0f);
-        for (int e = 0; e < num_elites; ++e) {
-            const float* elite_knots = &samples[indices[e] * n_params];
-            for (int k = 0; k < n_params; ++k) {
-                mean_[k] += weights[e] * elite_knots[k];
-            }
+    std::fill(stddev_.begin(), stddev_.end(), 0.0f);
+    for (int e = 0; e < num_elites; ++e) {
+        const float* elite_knots = &samples[indices[e] * n_params];
+        for (int k = 0; k < n_params; ++k) {
+            float diff = elite_knots[k] - mean_[k];
+            stddev_[k] += weights[e] * diff * diff;
         }
-
-        std::fill(stddev_.begin(), stddev_.end(), 0.0f);
-        for (int e = 0; e < num_elites; ++e) {
-            const float* elite_knots = &samples[indices[e] * n_params];
-            for (int k = 0; k < n_params; ++k) {
-                float diff = elite_knots[k] - mean_[k];
-                stddev_[k] += weights[e] * diff * diff;
-            }
-        }
-        for (float& s : stddev_) {
-            s = std::sqrt(s);
-            s = std::max(s, cem_config_.sigma_min);
-        }
+    }
+    for (float& s : stddev_) {
+        s = std::sqrt(s);
+        s = std::max(s, cem_config_.sigma_min);
     }
 
     // Remember the best samples for re-injection at the next replan.
