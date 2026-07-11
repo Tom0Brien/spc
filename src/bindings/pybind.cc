@@ -200,7 +200,8 @@ PYBIND11_MODULE(spc_py, m) {
         .def_readwrite("num_threads", &spc::algs::CEMConfig::num_threads)
         .def_readwrite("plan_timestep", &spc::algs::CEMConfig::plan_timestep)
         .def_readwrite("plan_iterations", &spc::algs::CEMConfig::plan_iterations)
-        .def_readwrite("plan_ls_iterations", &spc::algs::CEMConfig::plan_ls_iterations);
+        .def_readwrite("plan_ls_iterations", &spc::algs::CEMConfig::plan_ls_iterations)
+        .def_readwrite("prune_dominated", &spc::algs::CEMConfig::prune_dominated);
 
     py::class_<spc::algs::Optimizer, std::shared_ptr<spc::algs::Optimizer>>(m, "Optimizer");
 

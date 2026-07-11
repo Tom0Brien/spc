@@ -2,8 +2,12 @@
 
 #include <omp.h>
 
+#include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
+#include <limits>
+#include <mutex>
 #include <stdexcept>
 
 #include "spc/utils/spline.h"
@@ -36,9 +40,14 @@ Optimizer::Optimizer(mjModel* model, std::shared_ptr<core::Task> task, std::shar
         task_->SetPolicy(policy_);
     }
 
-    thread_datas_.resize(config.num_samples, nullptr);
-    for (int i = 0; i < config.num_samples; ++i) {
-        thread_datas_[i] = mj_makeData(model_);
+    // One mjData per worker thread (not per sample): every rollout starts by
+    // copying the root state, so data can be reused across the samples a
+    // thread processes, keeping the resident working set at num_threads
+    // mjDatas regardless of population size.
+    int num_datas = std::min(config.num_threads, config.num_samples);
+    thread_datas_.resize(std::max(num_datas, 1), nullptr);
+    for (mjData*& d : thread_datas_) {
+        d = mj_makeData(model_);
     }
 }
 
@@ -77,16 +86,31 @@ void Optimizer::EvaluateRollouts(const mjData* current_state, const std::vector<
     int n_params = nu * num_knots;
     int num_samples = config_.num_samples;
 
+    // Dominated-rollout pruning: once prune_rank_ rollouts have completed, any
+    // rollout whose accumulated cost exceeds the prune_rank_-th best completed
+    // cost can never rank in the top prune_rank_, so it stops stepping (costs
+    // are nonnegative, see OptimizerConfig::prune_dominated). The threshold
+    // only tightens as more rollouts finish, so pruning never discards a true
+    // elite and the distribution update is unchanged.
+    const bool prune = config_.prune_dominated && prune_rank_ > 0 && prune_rank_ < num_samples;
+    const double kInf = std::numeric_limits<double>::infinity();
+    std::atomic<double> prune_threshold(kInf);
+    std::mutex completed_mutex;
+    std::vector<double> completed_costs;
+    if (prune)
+        completed_costs.reserve(num_samples);
+
 // Rollout costs are heterogeneous (contact bursts, early divergence), so a
 // static schedule leaves threads idle behind the slowest chunk; dynamic
 // scheduling balances the makespan (same reason mujoco's rollout.cc chunks
 // work through a thread pool).
-#pragma omp parallel for schedule(dynamic, 1) num_threads(config_.num_threads)
+#pragma omp parallel for schedule(dynamic, 1) num_threads(static_cast<int>(thread_datas_.size()))
     for (int i = 0; i < num_samples; ++i) {
-        mjData* d = thread_datas_[i];
+        mjData* d = thread_datas_[omp_get_thread_num()];
         mj_copyData(d, model_, current_state);
 
         double total_cost = 0.0;
+        bool pruned = false;
         const float* sample_knots = &samples[i * n_params];
         float current_control[128];
 
@@ -113,6 +137,16 @@ void Optimizer::EvaluateRollouts(const mjData* current_state, const std::vector<
             if (task_) {
                 total_cost += task_->RunningCost(model_, d, current_control);
             }
+
+            if (prune && total_cost > prune_threshold.load(std::memory_order_relaxed)) {
+                pruned = true;
+                break;
+            }
+        }
+
+        if (pruned) {
+            costs[i] = kInf;
+            continue;
         }
 
         // Terminal cost
@@ -120,7 +154,18 @@ void Optimizer::EvaluateRollouts(const mjData* current_state, const std::vector<
             total_cost += task_->TerminalCost(model_, d);
         }
         costs[i] = total_cost;
+
+        if (prune) {
+            std::lock_guard<std::mutex> lock(completed_mutex);
+            completed_costs.push_back(total_cost);
+            if (static_cast<int>(completed_costs.size()) >= prune_rank_) {
+                std::nth_element(completed_costs.begin(), completed_costs.begin() + prune_rank_ - 1,
+                                 completed_costs.end());
+                prune_threshold.store(completed_costs[prune_rank_ - 1], std::memory_order_relaxed);
+            }
+        }
     }
+
 }
 
 void Optimizer::InterpPhaseDims(const float* knots, double time, float* control) const {

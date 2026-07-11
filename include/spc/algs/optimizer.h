@@ -32,6 +32,14 @@ struct OptimizerConfig {
     int phase_dims = 0;
     float phase_freq = 0.0f;
 
+    // Early termination of dominated rollouts: a rollout whose accumulated
+    // cost already exceeds the k-th best completed cost this iteration can
+    // never enter the elite set, so it stops stepping. Lossless for the CEM
+    // elite update, but requires nonnegative running/terminal costs; disable
+    // for tasks whose cost can be negative. Only saves wall time when
+    // num_samples > num_threads. (MPPI ignores this: it weights all samples.)
+    bool prune_dominated = true;
+
     // Coarse planning model: physics stepping dominates rollout cost, so the
     // rollouts can use a cheaper model than the real one. When plan_timestep>0,
     // rollouts run on a clone of the model with this larger timestep (and,
@@ -93,7 +101,12 @@ protected:
     std::shared_ptr<core::Policy> policy_;
     OptimizerConfig config_;
 
-    std::vector<mjData*> thread_datas_;
+    // Rollouts i whose cost cannot rank in the top prune_rank_ are terminated
+    // early (see OptimizerConfig::prune_dominated). Subclasses set this to
+    // their elite cutoff; 0 disables pruning.
+    int prune_rank_ = 0;
+
+    std::vector<mjData*> thread_datas_;  // one per worker thread
 };
 
 }  // namespace algs

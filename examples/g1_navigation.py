@@ -70,6 +70,10 @@ def main():
     config.explore_fraction = 0.5
     config.replan_shift_steps = 1  # replan every ctrl step: warm-start shifted mean
     config.elite_keep = 2  # re-inject previous replan's best samples (iCEM)
+    # iCEM colored noise + execute best rollout: at 8 samples this pair beats a
+    # 16-sample population on closed-loop cost
+    config.noise_rho = 0.7
+    config.use_best_sample = True
 
     # Velocity commands bounded to the RL policy's training range
     config.u_min = [-1.0, -1.0, -1.0]

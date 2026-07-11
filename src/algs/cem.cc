@@ -43,6 +43,13 @@ CEM::CEM(mjModel* model, std::shared_ptr<core::Task> task, std::shared_ptr<core:
     if (cem_config_.elite_keep > 0)
         kept_elites_.resize(cem_config_.elite_keep * n_params, 0.0f);
 
+    // Dominated rollouts can stop early once they can't rank among the
+    // samples the update consumes: the elite set plus re-injected elites.
+    // MPPI weights every sample, so pruning stays off there.
+    if (cem_config_.update_rule == 0) {
+        prune_rank_ = std::max(std::min(cem_config_.num_elites, config.num_samples), cem_config_.elite_keep);
+    }
+
     int max_threads = omp_get_max_threads();
     rngs_.resize(max_threads);
     for (int i = 0; i < max_threads; ++i) {

@@ -66,12 +66,8 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    # Planning uses the exact dt the RL policy was trained on (sim_dt=0.002,
-    # ctrl_dt=0.02 -> 10 substeps, matching mujoco_playground K1 joystick). A
-    # coarser planning dt desyncs the policy's gait phase and causes
-    # stutter-stepping. ~0.5x realtime on 8 cores.
-    config.num_samples = 16
-    config.num_elites = 8
+    config.num_samples = 8
+    config.num_elites = 4
     config.num_knots = 4
     config.num_iterations = 1
     config.plan_horizon_steps = 64
@@ -85,6 +81,8 @@ def main():
     config.explore_fraction = 0.5
     config.replan_shift_steps = 1  # replan every ctrl step: warm-start shifted mean
     config.elite_keep = 2  # re-inject previous replan's best samples (iCEM)
+    config.noise_rho = 0.7  # iCEM colored noise
+    config.use_best_sample = True  # execute best rollout, not the elite mean
 
     # Velocity commands bounded to the RL policy's training range
     config.u_min = [-1.0, -0.8, -1.0]

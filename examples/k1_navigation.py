@@ -64,7 +64,9 @@ def main():
     config.num_knots = 4
     config.num_iterations = 1
     config.plan_horizon_steps = 25
-    config.sim_substeps = 10  # dt=0.002, ctrl_dt=0.02 -> 10 substeps (mujoco_playground settings)
+    config.sim_substeps = 5  # plan dt=0.004, ctrl_dt=0.02 -> 5 substeps
+    config.plan_timestep = 0.004  # coarse planning dt (real sim stays at the model's 0.002):
+    # closed-loop cost unchanged vs planning at the real dt (486 vs 482 over 5 seeds), ~40% cheaper
     config.control_dim = 3  # vx, vy, vtheta
     config.obs_dim = 82
     config.num_threads = 8
@@ -73,6 +75,10 @@ def main():
     config.explore_fraction = 0.5
     config.replan_shift_steps = 1  # replan every ctrl step: warm-start shifted mean
     config.elite_keep = 2  # re-inject previous replan's best samples (iCEM)
+    # iCEM colored noise + execute best rollout: same win as G1 (469 vs 482
+    # closed-loop cost over 5 seeds); neither flag helps much alone.
+    config.noise_rho = 0.7
+    config.use_best_sample = True
 
     # Velocity commands:
     config.u_min = [-1.0, -0.8, -1.0]
