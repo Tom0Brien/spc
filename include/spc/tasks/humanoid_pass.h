@@ -24,12 +24,23 @@ public:
     double TerminalCost(const mjModel* model, const mjData* data) const override;
 
 protected:
+    // 0 when misaligned (alignment <= align_lo) -> 1 when the robot is lined
+    // up behind the ball along the ball->goal direction (>= align_hi).
+    double AlignGate(double align) const;
+
     int soccer_ball_id_;
+    int ball_dof_adr_;  // ball freejoint linear velocity (world frame)
 
     double standoff_distance_;
     double ball_goal_weight_;
-    double ball_goal_scale_;  // pseudo-Huber scale for the ball->goal distance (meters)
-    double behind_weight_;    // penalize being on the goal side of the ball when close
+    double ball_goal_scale_;    // pseudo-Huber scale for the ball->goal distance (meters)
+    double behind_weight_;      // penalize being on the goal side of the ball when close
+    double ball_decel_;         // ball rolling deceleration (m/s^2) for rest prediction; 0 = off
+    double approach_distance_;  // standoff while misaligned (meters)
+    double avoid_weight_;       // misaligned ball-proximity penalty
+    double avoid_radius_;       // proximity scale for the avoid penalty (meters)
+    double align_lo_;           // alignment cosines bounding the AlignGate ramp
+    double align_hi_;
 };
 
 }  // namespace tasks

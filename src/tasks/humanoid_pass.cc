@@ -20,6 +20,8 @@ HumanoidPass::HumanoidPass(mjModel* model, const core::TaskConfig& config, Human
     if (soccer_ball_id_ < 0) {
         throw std::runtime_error("Could not find soccer ball body: " + ball_name);
     }
+    ball_dof_adr_ =
+        model->body_jntnum[soccer_ball_id_] > 0 ? model->jnt_dofadr[model->body_jntadr[soccer_ball_id_]] : -1;
 
     standoff_distance_ = num("standoff_distance", 0.5);
     ball_goal_weight_ = num("ball_goal_weight", 1.0);
@@ -29,6 +31,14 @@ HumanoidPass::HumanoidPass(mjModel* model, const core::TaskConfig& config, Human
     // momentarily misaligned contact).
     behind_weight_ = num("behind_weight", 2.0);
 
+    // Dribbling shaping, off by default (see header).
+    ball_decel_ = num("ball_decel", 0.0);
+    approach_distance_ = num("approach_distance", standoff_distance_);
+    avoid_weight_ = num("avoid_weight", 0.0);
+    avoid_radius_ = num("avoid_radius", 0.35);
+    align_lo_ = num("align_lo", 0.5);
+    align_hi_ = num("align_hi", 0.9);
+
     // Pass-specific defaults for the navigation weights
     pos_weight_ = num("pos_weight", 0.3);
     ori_weight_ = num("ori_weight", 0.2);
@@ -36,25 +46,56 @@ HumanoidPass::HumanoidPass(mjModel* model, const core::TaskConfig& config, Human
     ctrl_weight_ = num("ctrl_weight", 0.01);
 }
 
+double HumanoidPass::AlignGate(double align) const {
+    double t = (align - align_lo_) / (align_hi_ - align_lo_);
+    t = std::fmin(1.0, std::fmax(0.0, t));
+    return t * t * (3.0 - 2.0 * t);  // smoothstep
+}
+
 double HumanoidPass::RunningCost(const mjModel* model, const mjData* data, const float* control) const {
     const mjtNum* ball_pos = data->xpos + 3 * soccer_ball_id_;
     const mjtNum* goal_pos = data->mocap_pos;  // goal from mocap body 0
 
     // Ball to goal cost: pseudo-Huber so a distant goal gives a constant
-    // gradient instead of quadratically dominating the stability terms
+    // gradient instead of quadratically dominating the stability terms.
+    // With ball_decel set, the ball is scored where it will come to rest
+    // (s = v|v| / 2a under constant rolling deceleration).
+    double rest_x = ball_pos[0];
+    double rest_y = ball_pos[1];
+    if (ball_decel_ > 0.0 && ball_dof_adr_ >= 0) {
+        double vx = data->qvel[ball_dof_adr_];
+        double vy = data->qvel[ball_dof_adr_ + 1];
+        double roll = std::sqrt(vx * vx + vy * vy) / (2.0 * ball_decel_);
+        rest_x += vx * roll;
+        rest_y += vy * roll;
+    }
+    double rest_dx = goal_pos[0] - rest_x;
+    double rest_dy = goal_pos[1] - rest_y;
+    double ball_goal_cost = PseudoHuber(std::sqrt(rest_dx * rest_dx + rest_dy * rest_dy), ball_goal_scale_);
+
+    // Ball->goal direction from the current ball position
     double b2g_x = goal_pos[0] - ball_pos[0];
     double b2g_y = goal_pos[1] - ball_pos[1];
     double ball_goal_dist = std::sqrt(b2g_x * b2g_x + b2g_y * b2g_y);
-    double ball_goal_cost = PseudoHuber(ball_goal_dist, ball_goal_scale_);
-
-    // Desired robot position (behind ball, along the ball->goal line)
     double dir_x = b2g_x / (ball_goal_dist + 1e-6);
     double dir_y = b2g_y / (ball_goal_dist + 1e-6);
-    double desired_x = ball_pos[0] - standoff_distance_ * dir_x;
-    double desired_y = ball_pos[1] - standoff_distance_ * dir_y;
 
     double rx = data->qpos[0];
     double ry = data->qpos[1];
+
+    // Robot alignment behind the ball: 1 = robot->ball points along ball->goal
+    double rb_x = ball_pos[0] - rx;
+    double rb_y = ball_pos[1] - ry;
+    double rb_dist = std::sqrt(rb_x * rb_x + rb_y * rb_y) + 1e-6;
+    double align = (rb_x * dir_x + rb_y * dir_y) / rb_dist;
+    double gate = AlignGate(align);
+
+    // Desired robot position: behind the ball along the ball->goal line, at
+    // approach_distance while misaligned, closing to standoff_distance (the
+    // dribbling distance) once lined up.
+    double standoff = approach_distance_ + gate * (standoff_distance_ - approach_distance_);
+    double desired_x = ball_pos[0] - standoff * dir_x;
+    double desired_y = ball_pos[1] - standoff * dir_y;
 
     double px = rx - desired_x;
     double py = ry - desired_y;
@@ -93,12 +134,13 @@ double HumanoidPass::RunningCost(const mjModel* model, const mjData* data, const
 
     // Behind-ball alignment: penalize being on the goal side of the ball,
     // gated by proximity so it only acts near the ball
-    double rb_x = ball_pos[0] - rx;
-    double rb_y = ball_pos[1] - ry;
-    double rb_dist = std::sqrt(rb_x * rb_x + rb_y * rb_y) + 1e-6;
-    double align = (rb_x * dir_x + rb_y * dir_y) / rb_dist;  // 1 = robot directly behind ball
     double proximity = std::exp(-rb_dist / 0.5);
     double behind_cost = (1.0 - align) * proximity;
+
+    // Misaligned ball avoidance: the ball is an obstacle until the robot is
+    // lined up behind it, so circling around beats pushing it off-line.
+    double avoid_r = rb_dist / avoid_radius_;
+    double avoid_cost = (1.0 - gate) * std::exp(-avoid_r * avoid_r);
 
     double ctrl_cost = 0.0;
     for (int i = 0; i < 3; ++i)
@@ -106,7 +148,7 @@ double HumanoidPass::RunningCost(const mjModel* model, const mjData* data, const
 
     return ball_goal_weight_ * ball_goal_cost + pos_weight_ * robot_pos_cost + ori_weight_ * robot_ori_cost +
            height_weight_ * height_cost + upright_weight_ * upright_cost + behind_weight_ * behind_cost +
-           ctrl_weight_ * ctrl_cost;
+           avoid_weight_ * avoid_cost + ctrl_weight_ * ctrl_cost;
 }
 
 double HumanoidPass::TerminalCost(const mjModel* model, const mjData* data) const {
