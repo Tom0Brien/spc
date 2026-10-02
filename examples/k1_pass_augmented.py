@@ -39,8 +39,7 @@ def main():
 
     task_params = {
         "action_scale": 1.0,
-        "gait_freq": 1.5,
-        "target_height": 0.543,
+        "target_height": 0.54,
 
         # Pass-specific weights
         "standoff_distance": 0.35,  # augmented: leg-swing residuals extend the foot's reach
@@ -80,19 +79,15 @@ def main():
             print("Continuing without policy...")
 
     config = spc_py.CEMConfig()
-    # Planning uses the exact dt the RL policy was trained on (sim_dt=0.002,
-    # ctrl_dt=0.02 -> 10 substeps, matching mujoco_playground K1 joystick). A
-    # coarser planning dt desyncs the policy's gait phase and causes
-    # stutter-stepping. ~0.45x realtime on 8 cores.
     config.num_samples = 24
     config.num_elites = 12
     config.num_knots = 4
     config.num_iterations = 1
     config.plan_horizon_steps = 48
-    config.sim_substeps = 5
-    config.plan_timestep = 0.004  # coarse planning dt (real sim stays at the model's 0.002)
+    config.sim_substeps = 2  # plan dt=0.01, ctrl_dt=0.02 -> 2 substeps
+    config.plan_timestep = 0.01  # coarse planning dt (real sim stays at the model's 0.005)
     config.control_dim = 15  # vx, vy, vtheta + 12 leg residuals
-    config.obs_dim = 85
+    config.obs_dim = 75
     config.num_threads = 8
     config.sigma_init = 0.5
     config.sigma_min = 0.05
@@ -140,7 +135,7 @@ def main():
         cem,
         model_path,
         sim_dt=0.02,
-        sim_steps_per_replan=10,
+        sim_steps_per_replan=4,  # 4 x 0.005 = ctrl_dt 0.02 (policy decimation)
         init_kwargs={"custom_init_fn": custom_init},
         record=args.record,
     )

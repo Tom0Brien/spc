@@ -64,15 +64,18 @@ HumanoidNavigation::HumanoidNavigation(mjModel* model, const core::TaskConfig& c
 
 void HumanoidNavigation::GetObservation(const mjModel* model, const mjData* data, float* obs_out) const {
     const int n = spec_.njoints;
+    const bool mjlab = spec_.obs_layout == ObsLayout::kMjlab;
     int idx = 0;
 
-    // 1. Local linear velocity of the base (3)
-    if (linvel_adr_ >= 0) {
-        for (int i = 0; i < 3; ++i)
-            obs_out[idx++] = static_cast<float>(data->sensordata[linvel_adr_ + i]);
-    } else {
-        for (int i = 0; i < 3; ++i)
-            obs_out[idx++] = 0.0f;
+    // 1. Local linear velocity of the base (3); playground layout only
+    if (!mjlab) {
+        if (linvel_adr_ >= 0) {
+            for (int i = 0; i < 3; ++i)
+                obs_out[idx++] = static_cast<float>(data->sensordata[linvel_adr_ + i]);
+        } else {
+            for (int i = 0; i < 3; ++i)
+                obs_out[idx++] = 0.0f;
+        }
     }
 
     // 2. Gyro (angular velocity) of the base (3)
@@ -97,10 +100,13 @@ void HumanoidNavigation::GetObservation(const mjModel* model, const mjData* data
         obs_out[idx++] = -1.0f;
     }
 
-    // 4. Command (3): zeros here; ApplyControl overwrites these slots with the
-    // clamped velocity command before running the policy.
-    for (int i = 0; i < 3; ++i)
-        obs_out[idx++] = 0.0f;
+    // 4. Command (3): zeros here; ApplyControl overwrites these slots (at
+    // CommandIndex()) with the clamped velocity command before running the
+    // policy. The playground layout puts it here, mjlab puts it last.
+    if (!mjlab) {
+        for (int i = 0; i < 3; ++i)
+            obs_out[idx++] = 0.0f;
+    }
 
     // 5. Joint angles - default_pose (njoints). Robot joints are qpos[7:].
     // The leading zero_obs_joints entries are zeroed (T1 head joints, per its
@@ -120,6 +126,14 @@ void HumanoidNavigation::GetObservation(const mjModel* model, const mjData* data
     for (int i = 0; i < n; ++i) {
         float motor_target = static_cast<float>(data->ctrl[i]);
         obs_out[idx++] = (motor_target - spec_.default_pose[i]) / action_scale_joint_[i];
+    }
+
+    if (mjlab) {
+        // 8. Command (3), see 4.
+        for (int i = 0; i < 3; ++i)
+            obs_out[idx++] = 0.0f;
+        // Total: 3+3 + 3*njoints + 3 = 9 + 3*njoints
+        return;
     }
 
     // 8. Gait phase (4): cos(phase_left), cos(phase_right), sin(phase_left), sin(phase_right)
@@ -184,10 +198,11 @@ double HumanoidNavigation::TerminalCost(const mjModel* model, const mjData* data
 void HumanoidNavigation::ApplyControl(const mjModel* model, mjData* data, const float* action) const {
     const int n = spec_.njoints;
 
-    // Build the observation with the velocity command inserted at slots 9..11,
-    // clamped to the command limits.
+    // Build the observation with the velocity command inserted at
+    // CommandIndex(), clamped to the command limits.
     float obs[128];  // max obs dim is 16 + 3*29 = 103
     GetObservation(model, data, obs);
+    const int cmd_idx = CommandIndex();
     float cmd_norm_sq = 0.0f;
     for (int i = 0; i < 3; ++i) {
         float cmd = action[i];
@@ -195,7 +210,7 @@ void HumanoidNavigation::ApplyControl(const mjModel* model, mjData* data, const 
             cmd = -vel_limit_[i];
         if (cmd > vel_limit_[i])
             cmd = vel_limit_[i];
-        obs[9 + i] = cmd;
+        obs[cmd_idx + i] = cmd;
         cmd_norm_sq += cmd * cmd;
     }
 
@@ -204,7 +219,7 @@ void HumanoidNavigation::ApplyControl(const mjModel* model, mjData* data, const 
     // only stands cleanly at zero, and a sampling optimizer never lands there
     // on its own, leaving the robot shuffling at the stand/walk boundary.
     if (cmd_norm_sq < cmd_deadzone_ * cmd_deadzone_) {
-        obs[9] = obs[10] = obs[11] = 0.0f;
+        obs[cmd_idx] = obs[cmd_idx + 1] = obs[cmd_idx + 2] = 0.0f;
         cmd_norm_sq = 0.0f;
     }
 
@@ -231,10 +246,12 @@ void HumanoidNavigation::ApplyControl(const mjModel* model, mjData* data, const 
     for (int i = 0; i < n; ++i) {
         float motor_target = spec_.default_pose[i] + policy_action[i] * action_scale_joint_[i];
 
-        if (motor_target < jnt_range_low_[i])
-            motor_target = jnt_range_low_[i];
-        if (motor_target > jnt_range_high_[i])
-            motor_target = jnt_range_high_[i];
+        if (spec_.clamp_targets) {
+            if (motor_target < jnt_range_low_[i])
+                motor_target = jnt_range_low_[i];
+            if (motor_target > jnt_range_high_[i])
+                motor_target = jnt_range_high_[i];
+        }
 
         data->ctrl[i] = motor_target;
     }

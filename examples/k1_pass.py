@@ -36,8 +36,7 @@ def main():
 
     task_params = {
         "action_scale": 1.0,
-        "gait_freq": 1.5,
-        "target_height": 0.543,
+        "target_height": 0.54,
 
         # Pass-specific weights
         "standoff_distance": 0.25,  # K1 is smaller than G1: stand closer so the feet reach the ball
@@ -71,10 +70,10 @@ def main():
     config.num_knots = 4
     config.num_iterations = 1
     config.plan_horizon_steps = 64
-    config.sim_substeps = 5
-    config.plan_timestep = 0.004  # coarse planning dt (real sim stays at the model's 0.002)
+    config.sim_substeps = 2  # plan dt=0.01, ctrl_dt=0.02 -> 2 substeps
+    config.plan_timestep = 0.01  # coarse planning dt (real sim stays at the model's 0.005)
     config.control_dim = 3  # vx, vy, vtheta
-    config.obs_dim = 85
+    config.obs_dim = 75
     config.num_threads = 8
     config.sigma_init = 0.5
     config.sigma_min = 0.05
@@ -120,7 +119,7 @@ def main():
         cem,
         model_path,
         sim_dt=0.02,
-        sim_steps_per_replan=10,
+        sim_steps_per_replan=4,  # 4 x 0.005 = ctrl_dt 0.02 (policy decimation)
         init_kwargs={"custom_init_fn": custom_init},
         record=args.record,
     )

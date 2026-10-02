@@ -31,9 +31,17 @@ inline double YawFromQuat(const mjtNum* q) {
 }
 
 /// Wrap an angle difference to [-pi, pi].
-inline double WrapAngle(double a) {
-    return std::atan2(std::sin(a), std::cos(a));
-}
+inline double WrapAngle(double a) { return std::atan2(std::sin(a), std::cos(a)); }
+
+/// Observation layout the locomotion policy was trained with.
+enum class ObsLayout {
+    // mujoco_playground joystick (G1, T1): local linvel, gyro, gravity,
+    // command, joint pos/vel, last action, gait phase. 16 + 3*njoints dims.
+    kPlayground,
+    // booster_mjlab velocity task (K1): gyro, gravity, joint pos/vel, last
+    // action, command. 9 + 3*njoints dims, no gait clock.
+    kMjlab,
+};
 
 /**
  * @brief Robot-specific constants for the shared humanoid tasks.
@@ -56,16 +64,21 @@ struct HumanoidSpec {
     float gait_freq = 1.5f;
     std::array<float, 3> vel_limit = {1.0f, 1.0f, 1.0f};  // vx, vy, vtheta command bounds
     double target_height = 0.0;
-    int zero_obs_joints = 0;              // leading joints zeroed in the observation (T1 head)
+    int zero_obs_joints = 0;               // leading joints zeroed in the observation (T1 head)
     bool pin_phase_when_standing = false;  // gait phase pinned to pi at ~zero command (T1)
     int leg_joint_start = 0;               // first leg joint index (augmented residuals)
+    ObsLayout obs_layout = ObsLayout::kPlayground;
+    // Clamp motor targets to the joint ranges. mjlab trains with unclamped
+    // targets, and leaving them unclamped keeps the last-action observation
+    // (recovered from ctrl) equal to the raw policy output.
+    bool clamp_targets = true;
 };
 
 /**
  * @brief Humanoid navigation task.
  *
  * Control dim is 3 (vx, vy, vtheta velocity commands). The RL policy takes the
- * observation (16 + 3*njoints dims) and outputs njoints motor targets;
+ * observation (see ObsLayout) and outputs njoints motor targets;
  * ApplyControl converts velocity commands -> observation -> policy inference
  * -> motor targets.
  *
@@ -81,10 +94,13 @@ public:
     double RunningCost(const mjModel* model, const mjData* data, const float* control) const override;
     double TerminalCost(const mjModel* model, const mjData* data) const override;
     void ApplyControl(const mjModel* model, mjData* data, const float* action) const override;
-    int GetObsDim() const { return 16 + 3 * spec_.njoints; }
+    int GetObsDim() const { return (spec_.obs_layout == ObsLayout::kMjlab ? 9 : 16) + 3 * spec_.njoints; }
     int GetActionDim() const { return spec_.njoints; }
 
 protected:
+    // First of the 3 velocity command slots in the observation.
+    int CommandIndex() const { return spec_.obs_layout == ObsLayout::kMjlab ? 6 + 3 * spec_.njoints : 9; }
+
     HumanoidSpec spec_;
 
     // Sensor addresses and site IDs

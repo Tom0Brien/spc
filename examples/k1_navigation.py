@@ -4,7 +4,8 @@ Uses the K1Navigation task with CEM optimization to navigate a Booster K1
 humanoid robot to a goal position defined by a mocap body marker.
 
 The velocity commands (vx, vy, vtheta) are optimized by CEM, and a trained
-locomotion policy (ONNX) converts them to motor targets at each step.
+locomotion policy (ONNX, the booster_mjlab walk policy) converts them to
+motor targets at each step.
 
 Usage: python3 examples/k1_navigation.py [--no_policy]
 """
@@ -36,8 +37,7 @@ def main():
 
     task_params = {
         "action_scale": 1.0,
-        "gait_freq": 1.5,
-        "target_height": 0.543,
+        "target_height": 0.54,
         "pos_weight": 1.0,
         "ori_weight": 1.0,
         "upright_weight": 2.0,
@@ -64,11 +64,11 @@ def main():
     config.num_knots = 4
     config.num_iterations = 1
     config.plan_horizon_steps = 25
-    config.sim_substeps = 5  # plan dt=0.004, ctrl_dt=0.02 -> 5 substeps
-    config.plan_timestep = 0.004  # coarse planning dt (real sim stays at the model's 0.002):
-    # closed-loop cost unchanged vs planning at the real dt (486 vs 482 over 5 seeds), ~40% cheaper
+    config.sim_substeps = 2  # plan dt=0.01, ctrl_dt=0.02 -> 2 substeps
+    config.plan_timestep = 0.01  # coarse planning dt (real sim stays at the model's 0.005); the
+    # booster_mjlab policy tracks commands the same at 0.01 as at its training dt
     config.control_dim = 3  # vx, vy, vtheta
-    config.obs_dim = 82
+    config.obs_dim = 75
     config.num_threads = 8
     config.sigma_init = 0.5
     config.sigma_min = 0.05
@@ -91,7 +91,7 @@ def main():
         cem,
         model_path,
         sim_dt=0.02,
-        sim_steps_per_replan=10,
+        sim_steps_per_replan=4,  # 4 x 0.005 = ctrl_dt 0.02 (policy decimation)
         init_kwargs={"keyframe_name": "home", "mocap_defaults": {0: ([3.0, 1.0, 0.05], [1.0, 0.0, 0.0, 0.0])}},
         record=args.record,
     )

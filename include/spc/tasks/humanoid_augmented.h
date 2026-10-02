@@ -18,7 +18,7 @@ namespace tasks {
  *
  * ApplyControl runs the RL policy on the velocity command (via the base class)
  * to obtain motor targets, then adds the leg residuals (starting at the spec's
- * leg_joint_start) and re-clamps to joint limits. The running cost additionally
+ * leg_joint_start) and re-clamps to joint limits (if the spec clamps). The running cost additionally
  * regularizes the residuals to discourage destabilizing leg motions.
  *
  * When gate_near/gate_far are configured, the residuals are gated by the
@@ -65,10 +65,12 @@ public:
             int j = leg_joint_start_ + i;
             float motor_target = static_cast<float>(data->ctrl[j]) + gate * residuals[i];
 
-            if (motor_target < this->jnt_range_low_[j])
-                motor_target = this->jnt_range_low_[j];
-            if (motor_target > this->jnt_range_high_[j])
-                motor_target = this->jnt_range_high_[j];
+            if (this->spec_.clamp_targets) {
+                if (motor_target < this->jnt_range_low_[j])
+                    motor_target = this->jnt_range_low_[j];
+                if (motor_target > this->jnt_range_high_[j])
+                    motor_target = this->jnt_range_high_[j];
+            }
 
             data->ctrl[j] = motor_target;
         }
